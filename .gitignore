@@ -1,0 +1,26 @@
+# Xcode / Swift
+## User settings
+xcuserdata/
+*.xcuserstate
+
+## Build products & derived data
+build/
+DerivedData/
+*.moved-aside
+*.hmap
+*.ipa
+*.dSYM.zip
+*.dSYM
+
+## Swift Package Manager
+.build/
+.swiftpm/
+
+## macOS
+.DS_Store
+
+## MokaRig: local virtual machine bundles (never commit VM disk images)
+*.mokarig
+
+## Cloudflare Wrangler (release/distribution tooling)
+.wrangler/

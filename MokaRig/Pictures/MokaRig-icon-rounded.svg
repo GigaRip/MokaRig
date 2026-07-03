@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024">
+<defs>
+  <radialGradient id="led" cx="0.5" cy="0.40" r="0.65"><stop offset="0" stop-color="#FFFFFF"/><stop offset="0.5" stop-color="#F4F5F7"/><stop offset="1" stop-color="#D9DCE1"/></radialGradient>
+  <radialGradient id="halo" cx="0.5" cy="0.5" r="0.5">
+    <stop offset="0" stop-color="#FFFFFF" stop-opacity="0.5"/>
+    <stop offset="0.6" stop-color="#FFFFFF" stop-opacity="0.15"/>
+    <stop offset="1" stop-color="#FFFFFF" stop-opacity="0"/>
+  </radialGradient>
+  <clipPath id="squircle"><rect width="1024" height="1024" rx="229" ry="229"/></clipPath>
+</defs>
+<g clip-path="url(#squircle)">
+  <rect width="1024" height="1024" fill="#17161A"/>
+  <path d="M 781.77 623.74 L 623.74 781.77 L 400.26 781.77 L 242.23 623.74 L 242.23 400.26 L 400.26 242.23 L 623.74 242.23 L 781.77 400.26 Z" fill="none" stroke="white" stroke-width="104" stroke-linejoin="round"/>
+  <circle cx="512" cy="512" r="182" fill="url(#halo)"/>
+  <circle cx="512" cy="512" r="96" fill="url(#led)"/>
+</g>
+</svg>
