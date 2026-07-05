@@ -42,7 +42,7 @@ struct ContentView: View {
                 }
             }
             .navigationTitle("Virtual Machines")
-            .navigationSplitViewColumnWidth(min: 220, ideal: 260)
+            .navigationSplitViewColumnWidth(min: 220, ideal: 260, max: 400)
             // SwiftUI has no double-click-row API, so this hooks the underlying NSTableView's
             // native double-click to launch or focus a row's window without disturbing selection.
             .background(SidebarDoubleClick { openRow($0) })
