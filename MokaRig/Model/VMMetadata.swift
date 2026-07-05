@@ -42,12 +42,18 @@ struct VMMetadata: Codable, Equatable, Sendable {
     static let maxNameLength = 40
 
     /// Makes a raw name string safe to use as a bundle folder name: strips characters that can't
-    /// appear in a filename (`/`, `:`, control characters) and clamps to the length limit. Used to
-    /// sanitize the name field as the user types. Does not substitute a default for an empty result —
-    /// that's resolved when the bundle is actually created or renamed.
+    /// appear in a filename (`/`, `:`, control characters), removes any leading dot (which would make
+    /// a bundle Finder hides by default), and clamps to the length limit. Used to sanitize the name
+    /// field as the user types. Does not substitute a default for an empty result — that's resolved
+    /// when the bundle is actually created or renamed.
     static func sanitizedInput(_ raw: String) -> String {
         let illegal = CharacterSet(charactersIn: "/:").union(.controlCharacters)
-        let cleaned = raw.components(separatedBy: illegal).joined()
+        var cleaned = raw.components(separatedBy: illegal).joined()
+        // Drop leading dots even behind leading whitespace, so a name like " .hidden" can't slip a
+        // dot past the caller's later whitespace trim. Interior and trailing dots are untouched.
+        while case let stripped = cleaned.drop(while: { $0 == " " }), stripped.first == "." {
+            cleaned = String(stripped.drop(while: { $0 == "." }))
+        }
         return String(cleaned.prefix(maxNameLength))
     }
 

@@ -191,7 +191,7 @@ private struct VMRunnerContent: View {
             ContentUnavailableView(
                 "Powered Off",
                 systemImage: "power",
-                description: Text("This virtual machine isn’t running. Press Start to boot it."))
+                description: Text("This virtual machine isn’t running. Press Start in the toolbar to boot it."))
                 .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 16))
         case .starting:
             ProgressView("Starting…")
