@@ -23,7 +23,9 @@ struct ContentView: View {
     @State private var blockingSiblingName = ""
 
     var body: some View {
-        NavigationSplitView {
+        // The sidebar is the app's primary navigation, so it's pinned open: visibility is fixed to
+        // `.all`, the collapse toolbar button is removed, and the min column width blocks drag-collapse.
+        NavigationSplitView(columnVisibility: .constant(.all)) {
             List(selection: $selection) {
                 ForEach(library.machines) { listing in
                     Label {
@@ -38,6 +40,7 @@ struct ContentView: View {
                     }
                     .padding(.vertical, 6)
                     .tag(listing.id)
+                    .listRowSeparator(.visible)
                 }
             }
             .navigationTitle("Virtual Machines")
@@ -54,7 +57,10 @@ struct ContentView: View {
                 }
             }
             .toolbar {
-                ToolbarItem {
+                // A leading Spacer pushes the New button to the sidebar's trailing edge; without the
+                // sidebar toggle beside it, the button otherwise anchors next to the window controls.
+                ToolbarItemGroup(placement: .automatic) {
+                    Spacer()
                     Button {
                         isPresentingNewVM = true
                     } label: {
@@ -62,6 +68,7 @@ struct ContentView: View {
                     }
                 }
             }
+            .toolbar(removing: .sidebarToggle)
         } detail: {
             if let selection, let listing = library.listing(for: selection) {
                 VMDetailView(listing: listing, selection: $selection)
