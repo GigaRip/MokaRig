@@ -117,11 +117,28 @@ wrangler r2 object put "$BUCKET/MokaRig-$VERSION.dmg" --file "$DMG" --remote
 # Stable alias for the website download button:
 wrangler r2 object put "$BUCKET/MokaRig.dmg" --file "$DMG" --remote
 
-# --- 8. Generate and publish the Sparkle appcast ------------------------------
-# generate_appcast scans RELEASES_DIR for release DMGs and (re)writes appcast.xml
-# in place, EdDSA-signing each enclosure whose embedded app has a SUPublicEDKey
-# matching the login-keychain key. It reuses existing entries and appends new
-# versions, so all prior DMGs must remain in RELEASES_DIR to stay in the feed.
+# --- 8. Sync the published feed state from R2 ---------------------------------
+# generate_appcast rebuilds the feed from whatever DMGs are in RELEASES_DIR, so a
+# release from a machine missing older DMGs would silently drop them from the feed.
+# Treat R2 as the source of truth: pull the live appcast and the DMGs it references
+# first, so the regenerated feed stays complete no matter which machine releases.
+echo "==> Syncing published feed from R2"
+mkdir -p "$RELEASES_DIR"
+if wrangler r2 object get "$BUCKET/appcast.xml" --file "$RELEASES_DIR/appcast.xml" --remote 2>/dev/null; then
+  for name in $(grep -oE 'MokaRig-[0-9.]+\.dmg' "$RELEASES_DIR/appcast.xml" | sort -u); do
+    [ -f "$RELEASES_DIR/$name" ] && continue
+    echo "    fetching $name"
+    wrangler r2 object get "$BUCKET/$name" --file "$RELEASES_DIR/$name" --remote 2>/dev/null \
+      || echo "    warning: $name is in the appcast but missing from R2"
+  done
+else
+  echo "    no existing appcast in R2 (first release?) — continuing"
+fi
+
+# --- 9. Generate and publish the Sparkle appcast ------------------------------
+# generate_appcast (re)writes appcast.xml from the DMGs now in RELEASES_DIR (synced
+# from R2 above plus this release), EdDSA-signing each enclosure whose embedded app
+# has a SUPublicEDKey matching the login-keychain key.
 echo "==> Generating appcast"
 # Sparkle's tools ship as an SPM binary artifact, resolved into DerivedData by
 # the archive step above. Override SPARKLE_BIN to point elsewhere.
