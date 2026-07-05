@@ -31,6 +31,11 @@ few deliberate principles:
   data files. Aside from a small standard macOS preferences file used by the
   auto-updater, it keeps to itself. To uninstall, drag MokaRig to the Trash; to
   remove your virtual machines, delete the `~/MokaRigVMs` folder.
+- **Thoughtful design and implementation.** MokaRig sweats the details so you
+  don't have to. For example, duplicating a virtual machine is a single click —
+  but two machines that share the same guest identity on the same network would
+  collide. MokaRig recognizes copies (even ones you make in Finder) and won't run
+  a clone alongside its original until you give it its own identity.
 
 ## Features
 
