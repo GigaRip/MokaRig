@@ -13,11 +13,12 @@ import Virtualization
 /// The window that runs a single virtual machine and displays its screen.
 struct VMRunnerWindow: View {
     @Environment(VMLibrary.self) private var library
+    @Environment(VMRunner.self) private var runner
     let bundleURL: URL?
 
     var body: some View {
         Group {
-            if let bundleURL, let listing = library.listing(for: bundleURL) {
+            if let bundleURL, let listing = resolvedListing(for: bundleURL) {
                 VMRunnerContent(listing: listing)
             } else {
                 ContentUnavailableView(
@@ -27,6 +28,13 @@ struct VMRunnerWindow: View {
                     .frame(minWidth: 640, minHeight: 400)
             }
         }
+    }
+
+    /// Prefers the library's current listing, but falls back to a still-running instance's captured
+    /// listing — so a VM whose files were removed while it runs (e.g. deleted in Finder) keeps its
+    /// window and Stop controls instead of becoming unstoppable.
+    private func resolvedListing(for url: URL) -> VMListing? {
+        library.listing(for: url) ?? runner.liveInstance(for: url)?.listing
     }
 }
 
@@ -53,7 +61,7 @@ private struct VMRunnerContent: View {
     /// The window's title drives the Window menu, so it's always the VM name to keep each runner
     /// window distinct from the others and from the main window.
     private var windowTitle: String {
-        listing.metadata.name
+        listing.name
     }
 
     var body: some View {
@@ -135,7 +143,7 @@ private struct VMRunnerContent: View {
                     library.ejectInstallerIfInstalled(listing)
                 }
             }
-            .confirmationDialog("Do you want to force “\(listing.metadata.name)” to power off?",
+            .confirmationDialog("Do you want to force “\(listing.name)” to power off?",
                                 isPresented: $isConfirmingForceStop, titleVisibility: .visible) {
                 Button("Force Stop", role: .destructive) {
                     runner.forceStop(listing.id)
@@ -143,7 +151,7 @@ private struct VMRunnerContent: View {
             } message: {
                 Text("Unsaved work in the guest may be lost — this is like pulling the plug.")
             }
-            .confirmationDialog("Do you want to force “\(listing.metadata.name)” to power off?",
+            .confirmationDialog("Do you want to force “\(listing.name)” to power off?",
                                 isPresented: $isConfirmingClose, titleVisibility: .visible) {
                 Button("Force Stop", role: .destructive) {
                     runner.forceStop(listing.id)

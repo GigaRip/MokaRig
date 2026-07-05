@@ -19,6 +19,9 @@ struct VMListing: Identifiable, Hashable, Sendable {
 
     var id: VMBundle.ID { bundle.id }
 
+    /// The VM's name — its bundle's folder name, the single source of truth.
+    var name: String { bundle.displayName }
+
     // Include metadata so edits are detected — comparing only the bundle would let SwiftUI
     // treat an edited VM as unchanged and skip refreshing the detail view.
     static func == (lhs: VMListing, rhs: VMListing) -> Bool {
@@ -37,12 +40,19 @@ final class VMLibrary {
     /// The virtual machines discovered on disk, sorted by name.
     private(set) var machines: [VMListing] = []
 
+    /// Keeps the library in sync with changes the user makes to the VMs folder in Finder.
+    private var watcher: DirectoryWatcher?
+
     init(rootDirectory: URL? = nil) {
         self.rootDirectory = rootDirectory ?? FileManager.default
             .homeDirectoryForCurrentUser
             .appendingPathComponent("MokaRigVMs", isDirectory: true)
         try? FileManager.default.createDirectory(at: self.rootDirectory, withIntermediateDirectories: true)
         reload()
+        watcher = DirectoryWatcher(url: self.rootDirectory) { [weak self] in
+            guard let self else { return }
+            Task { @MainActor in self.reload() }
+        }
     }
 
     /// Rescans the root directory for VM bundles.
@@ -55,19 +65,10 @@ final class VMLibrary {
             .filter { $0.pathExtension == VMBundle.fileExtension }
             .compactMap { url in
                 let bundle = VMBundle(url: url)
-                guard var metadata = try? bundle.loadMetadata() else { return nil }
-                // Fix up bundles created before the hidden-extension flag was applied.
-                try? bundle.hideFileExtension()
-                // Every VM needs a lineage ID. Backfill bundles created before the field existed, and
-                // persist it — so a later Finder copy of this bundle inherits the ID and is recognized
-                // as a copy (guarded), just like one made through Duplicate.
-                if metadata.cloneGroup == nil {
-                    metadata.cloneGroup = UUID()
-                    try? bundle.save(metadata)
-                }
+                guard let metadata = try? bundle.loadMetadata() else { return nil }
                 return VMListing(bundle: bundle, metadata: metadata)
             }
-            .sorted { $0.metadata.name.localizedCaseInsensitiveCompare($1.metadata.name) == .orderedAscending }
+            .sorted { $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending }
     }
 
     /// Returns the loaded listing for the given bundle identity, or nil if none is present.
@@ -75,9 +76,10 @@ final class VMLibrary {
         machines.first { $0.bundle.id == id }
     }
 
-    /// Returns a unique bundle URL for a new VM with the given name.
+    /// Returns a unique bundle URL for a new VM with the given name, sanitized for use as a folder
+    /// name and de-duplicated against existing bundles with a numeric suffix.
     func availableBundleURL(forName name: String) -> URL {
-        let trimmed = name.trimmingCharacters(in: .whitespacesAndNewlines)
+        let trimmed = VMMetadata.sanitizedInput(name).trimmingCharacters(in: .whitespacesAndNewlines)
         let safeName = trimmed.isEmpty ? "Virtual Machine" : trimmed
         var candidate = rootDirectory
             .appendingPathComponent(safeName)
@@ -103,7 +105,6 @@ final class VMLibrary {
         try bundle.createBlankDiskImage(sizeInBytes: diskBytes)
 
         var metadata = VMMetadata.defaultLinux
-        metadata.name = name
         metadata.cpuCount = cpuCount
         metadata.memorySizeInBytes = memoryBytes
         metadata.displayWidthInPixels = displayWidth
@@ -119,26 +120,46 @@ final class VMLibrary {
         return VMListing(bundle: bundle, metadata: metadata)
     }
 
-    /// Writes updated metadata for an existing VM, renaming the bundle on disk when the name
-    /// changes, and rescans. Returns the (possibly renamed) listing so callers can follow the
-    /// identity change, since a VM is identified by its bundle URL.
+    /// Writes updated metadata for an existing VM and rescans. The VM's name lives in its folder name,
+    /// not in metadata, so this never renames the bundle — use `rename(_:to:)` for that.
     @discardableResult
     func update(_ listing: VMListing, metadata: VMMetadata) throws -> VMListing {
-        var bundle = listing.bundle
-        if metadata.name != listing.metadata.name {
-            let newURL = availableBundleURL(forName: metadata.name)
-            try FileManager.default.moveItem(at: listing.bundle.url, to: newURL)
-            bundle = VMBundle(url: newURL)
-            try bundle.hideFileExtension()
-        }
-        try bundle.save(metadata)
+        try listing.bundle.save(metadata)
         reload()
-        // Return the reloaded listing so its identity matches the entries in `machines`.
-        // A freshly constructed URL can normalize differently (e.g. trailing slash) than the
-        // directory URLs the file system hands back, which would break selection matching.
-        let targetPath = bundle.url.standardizedFileURL.path
+        return machines.first { $0.id == listing.id }
+            ?? VMListing(bundle: listing.bundle, metadata: metadata)
+    }
+
+    /// Renames a VM by moving its bundle folder, and rescans. Returns the renamed listing so callers
+    /// can follow the identity change, since a VM is identified by its bundle URL.
+    ///
+    /// Like Finder, a rename to a name already in use is rejected rather than silently de-duplicated:
+    /// the user chose that name, so the collision is surfaced as `VMError.nameInUse`. A no-op rename
+    /// (same name after sanitizing) returns the current listing unchanged.
+    /// - Throws: `VMError.nameInUse` if another bundle already has the target name.
+    @discardableResult
+    func rename(_ listing: VMListing, to newName: String) throws -> VMListing {
+        let sanitized = VMMetadata.sanitizedInput(newName).trimmingCharacters(in: .whitespacesAndNewlines)
+        let targetName = sanitized.isEmpty ? "Virtual Machine" : sanitized
+        if targetName == listing.name { return listing }
+
+        let newURL = rootDirectory
+            .appendingPathComponent(targetName)
+            .appendingPathExtension(VMBundle.fileExtension)
+        guard !FileManager.default.fileExists(atPath: newURL.path) else {
+            throw VMError.nameInUse(targetName)
+        }
+
+        try FileManager.default.moveItem(at: listing.bundle.url, to: newURL)
+        let bundle = VMBundle(url: newURL)
+        try bundle.hideFileExtension()
+        reload()
+        // Match against the reloaded entries so the returned identity is the file-system URL, which
+        // can normalize differently (e.g. trailing slash) than a freshly constructed one — a mismatch
+        // there would break sidebar selection.
+        let targetPath = newURL.standardizedFileURL.path
         return machines.first { $0.bundle.url.standardizedFileURL.path == targetPath }
-            ?? VMListing(bundle: bundle, metadata: metadata)
+            ?? VMListing(bundle: bundle, metadata: listing.metadata)
     }
 
     /// Duplicates a VM into a new, independent bundle and returns its listing.
@@ -153,14 +174,12 @@ final class VMLibrary {
     @discardableResult
     func duplicate(_ listing: VMListing, newName: String) throws -> VMListing {
         let trimmed = newName.trimmingCharacters(in: .whitespacesAndNewlines)
-        let resolvedName = trimmed.isEmpty
-            ? "\(listing.metadata.name) copy"
-            : String(trimmed.prefix(VMMetadata.maxNameLength))
+        let resolvedName = trimmed.isEmpty ? "\(listing.name) copy" : trimmed
         let source = listing.bundle.url
         let destination = availableBundleURL(forName: resolvedName)
         // The duplicate shares the source's lineage ID — the same way a Finder copy of the bundle
         // would inherit it — so MokaRig keeps them from running at once until one is made independent.
-        let group = listing.metadata.cloneGroup ?? UUID()
+        let group = listing.metadata.cloneGroup
 
         // COPYFILE_CLONE makes an APFS copy-on-write clone when possible and transparently falls back
         // to a byte copy otherwise. It requires the destination not to exist, which availableBundleURL
@@ -175,7 +194,6 @@ final class VMLibrary {
         try regenerateMachineIdentity(for: newBundle, guestOS: listing.metadata.guestOS)
 
         var metadata = listing.metadata
-        metadata.name = resolvedName
         metadata.cloneGroup = group
         try newBundle.save(metadata)
 
@@ -201,7 +219,7 @@ final class VMLibrary {
     /// The other VMs that are copies of this one — they share its lineage ID. Empty when this VM has
     /// no copies (the common case), so nothing about it is guarded.
     func cloneSiblings(of listing: VMListing) -> [VMListing] {
-        guard let group = listing.metadata.cloneGroup else { return [] }
+        let group = listing.metadata.cloneGroup
         return machines.filter { $0.id != listing.id && $0.metadata.cloneGroup == group }
     }
 

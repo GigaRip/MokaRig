@@ -10,8 +10,11 @@
 import Foundation
 
 /// The persisted description of a virtual machine, stored as `Config.json` inside the VM bundle.
+///
+/// A VM's name is deliberately *not* stored here: it is the bundle's folder name (`VMBundle.displayName`),
+/// the single source of truth. That makes names filesystem-unique for free and keeps them in sync with
+/// Finder — no cached copy to drift.
 struct VMMetadata: Codable, Equatable, Sendable {
-    var name: String
     var guestOS: GuestOS
     var cpuCount: Int
     var memorySizeInBytes: UInt64
@@ -32,16 +35,24 @@ struct VMMetadata: Codable, Equatable, Sendable {
     /// unique one at creation; a copy — whether made through Duplicate or by copying the bundle in
     /// Finder (which inherits this value) — shares it. VMs that share an ID also share a guest identity
     /// (hostname, machine-id, SSH host keys), so MokaRig won't run two of them at once until one is
-    /// made independent (assigned a fresh ID). Optional only so bundles written before this field
-    /// decode as nil and get a fresh ID backfilled on load.
-    var cloneGroup: UUID? = nil
+    /// made independent (assigned a fresh ID).
+    var cloneGroup: UUID
 
     /// The maximum VM name length, to keep the sidebar, window titles, and spec chips from overflowing.
     static let maxNameLength = 40
 
+    /// Makes a raw name string safe to use as a bundle folder name: strips characters that can't
+    /// appear in a filename (`/`, `:`, control characters) and clamps to the length limit. Used to
+    /// sanitize the name field as the user types. Does not substitute a default for an empty result —
+    /// that's resolved when the bundle is actually created or renamed.
+    static func sanitizedInput(_ raw: String) -> String {
+        let illegal = CharacterSet(charactersIn: "/:").union(.controlCharacters)
+        let cleaned = raw.components(separatedBy: illegal).joined()
+        return String(cleaned.prefix(maxNameLength))
+    }
+
     /// Sensible defaults for a new Linux guest.
     static let defaultLinux = VMMetadata(
-        name: "Linux VM",
         guestOS: .linux,
         cpuCount: 4,
         memorySizeInBytes: 4 * 1024 * 1024 * 1024,
@@ -50,11 +61,11 @@ struct VMMetadata: Codable, Equatable, Sendable {
         pixelsPerInch: 80,
         needsInstall: true,
         installerMediaPath: nil,
-        dynamicResolution: false)
+        dynamicResolution: false,
+        cloneGroup: UUID())
 
     /// Sensible defaults for a new macOS guest.
     static let defaultMac = VMMetadata(
-        name: "macOS VM",
         guestOS: .macOS,
         cpuCount: 4,
         memorySizeInBytes: 8 * 1024 * 1024 * 1024,
@@ -63,5 +74,6 @@ struct VMMetadata: Codable, Equatable, Sendable {
         pixelsPerInch: 144,
         needsInstall: true,
         installerMediaPath: nil,
-        dynamicResolution: false)
+        dynamicResolution: false,
+        cloneGroup: UUID())
 }

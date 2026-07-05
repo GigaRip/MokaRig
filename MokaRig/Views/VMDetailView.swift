@@ -33,7 +33,7 @@ struct VMDetailView: View {
         let isActive = runner.isActive(listing.id)
         Form {
             Section {
-                detailRow("Name", value: metadata.name, systemImage: "tag")
+                detailRow("Name", value: listing.name, systemImage: "tag")
                 detailRow("Guest OS", value: metadata.guestOS.displayName, systemImage: "pc")
             }
             Section("Resources") {
@@ -126,7 +126,7 @@ struct VMDetailView: View {
                 } else {
                     Button {
                         if let running = library.cloneSiblings(of: listing).first(where: { runner.isActive($0.id) }) {
-                            blockingSiblingName = running.metadata.name
+                            blockingSiblingName = running.name
                             isBlockedBySibling = true
                         } else {
                             runner.start(listing)
@@ -168,7 +168,7 @@ struct VMDetailView: View {
         .sheet(isPresented: $isPresentingEdit) {
             EditVMSheet(listing: listing, selection: $selection)
         }
-        .confirmationDialog("Move “\(metadata.name)” to the Trash?",
+        .confirmationDialog("Move “\(listing.name)” to the Trash?",
                             isPresented: $isConfirmingDelete, titleVisibility: .visible) {
             Button("Move to Trash", role: .destructive) {
                 do {
@@ -182,7 +182,7 @@ struct VMDetailView: View {
         } message: {
             Text("The virtual machine and its disk image move to the Trash. You can restore them until you empty it.")
         }
-        .confirmationDialog("“\(metadata.name)” can't be moved to the Trash.",
+        .confirmationDialog("“\(listing.name)” can't be moved to the Trash.",
                             isPresented: $isConfirmingPermanentDelete, titleVisibility: .visible) {
             Button("Delete Permanently", role: .destructive) {
                 library.permanentlyDelete(listing)
@@ -198,7 +198,7 @@ struct VMDetailView: View {
         } message: {
             Text("The VM will boot from its disk from now on. Your installer file is not deleted.")
         }
-        .confirmationDialog("Do you want to force “\(metadata.name)” to power off?",
+        .confirmationDialog("Do you want to force “\(listing.name)” to power off?",
                             isPresented: $isConfirmingForceStop, titleVisibility: .visible) {
             Button("Force Stop", role: .destructive) {
                 runner.forceStop(listing.id)
@@ -209,7 +209,7 @@ struct VMDetailView: View {
         .sheet(isPresented: $isPresentingDuplicate) {
             DuplicateVMSheet(listing: listing, selection: $selection)
         }
-        .confirmationDialog("Make “\(metadata.name)” independent?",
+        .confirmationDialog("Make “\(listing.name)” independent?",
                             isPresented: $isConfirmingIndependent, titleVisibility: .visible) {
             Button("Make Independent") {
                 try? library.makeIndependent(listing)
@@ -218,7 +218,7 @@ struct VMDetailView: View {
             Text("Do this only after giving the guest OS its own identity. MokaRig will then let it run at the same time as the other virtual machine.")
         }
         .cannotStartCloneAlert(isPresented: $isBlockedBySibling,
-                               vmName: metadata.name, runningSiblingName: blockingSiblingName)
+                               vmName: listing.name, runningSiblingName: blockingSiblingName)
     }
 
     // MARK: - Rows

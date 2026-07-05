@@ -15,6 +15,8 @@ import Virtualization
 struct NewVMSheet: View {
     @Environment(VMLibrary.self) private var library
     @Environment(\.dismiss) private var dismiss
+    /// The sidebar selection, moved to the VM once it's created.
+    @Binding var selection: VMBundle.ID?
 
     /// The sensible CPU-count ceiling: the host's core count (never more than the framework allows).
     /// `maximumAllowedCPUCount` is an absolute API limit (64), not the hardware — assigning more
@@ -80,9 +82,8 @@ struct NewVMSheet: View {
                         }
                         .labelsHidden()
                         .onChange(of: name) { _, newValue in
-                            if newValue.count > VMMetadata.maxNameLength {
-                                name = String(newValue.prefix(VMMetadata.maxNameLength))
-                            }
+                            let sanitized = VMMetadata.sanitizedInput(newValue)
+                            if sanitized != newValue { name = sanitized }
                         }
                     } label: {
                         Label("Name", systemImage: "tag")
@@ -256,20 +257,21 @@ struct NewVMSheet: View {
         switch guestOS {
         case .linux:
             do {
-                try library.createLinuxVM(name: resolvedName, cpuCount: cpuCount,
+                let created = try library.createLinuxVM(name: resolvedName, cpuCount: cpuCount,
                                           memoryBytes: memoryBytes, diskBytes: diskBytes,
                                           displayWidth: resolution.widthInPixels,
                                           displayHeight: resolution.heightInPixels,
                                           displayPixelsPerInch: resolution.pixelsPerInch,
                                           dynamicResolution: dynamicResolution,
                                           installerISO: mediaURL)
+                selection = created.id
                 dismiss()
             } catch {
                 errorMessage = error.localizedDescription
             }
         case .macOS:
             Task {
-                await installer.install(name: resolvedName, cpuCount: cpuCount,
+                let createdID = await installer.install(name: resolvedName, cpuCount: cpuCount,
                                         memoryBytes: memoryBytes, diskBytes: diskBytes,
                                         displayWidth: resolution.widthInPixels,
                                         displayHeight: resolution.heightInPixels,
@@ -278,6 +280,7 @@ struct NewVMSheet: View {
                                         ipswURL: mediaURL, into: library)
                 switch installer.phase {
                 case .finished:
+                    selection = createdID
                     dismiss()
                 case .failed(let message):
                     errorMessage = message

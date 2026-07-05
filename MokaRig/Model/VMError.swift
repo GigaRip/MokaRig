@@ -17,6 +17,7 @@ enum VMError: LocalizedError {
     case unsupportedHardwareModel
     case configurationInvalid(String)
     case duplicateFailed(String)
+    case nameInUse(String)
 
     var errorDescription: String? {
         switch self {
@@ -32,6 +33,8 @@ enum VMError: LocalizedError {
             return "The virtual machine configuration is invalid: \(reason)"
         case .duplicateFailed(let reason):
             return "The virtual machine couldn't be duplicated: \(reason)"
+        case .nameInUse(let name):
+            return "A virtual machine named “\(name)” already exists."
         }
     }
 }

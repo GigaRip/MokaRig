@@ -24,7 +24,7 @@ struct DuplicateVMSheet: View {
     init(listing: VMListing, selection: Binding<VMBundle.ID?>) {
         self.listing = listing
         self._selection = selection
-        _name = State(initialValue: String("\(listing.metadata.name) copy".prefix(VMMetadata.maxNameLength)))
+        _name = State(initialValue: VMMetadata.sanitizedInput("\(listing.name) copy"))
     }
 
     var body: some View {
@@ -72,12 +72,11 @@ struct DuplicateVMSheet: View {
                     GroupBox {
                         HStack(spacing: 12) {
                             Label("Name", systemImage: "tag")
-                            TextField("\(listing.metadata.name) copy", text: $name)
+                            TextField("\(listing.name) copy", text: $name)
                                 .textFieldStyle(.roundedBorder)
                                 .onChange(of: name) { _, newValue in
-                                    if newValue.count > VMMetadata.maxNameLength {
-                                        name = String(newValue.prefix(VMMetadata.maxNameLength))
-                                    }
+                                    let sanitized = VMMetadata.sanitizedInput(newValue)
+                                    if sanitized != newValue { name = sanitized }
                                 }
                         }
                         .padding(10)

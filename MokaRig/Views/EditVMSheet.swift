@@ -29,7 +29,7 @@ struct EditVMSheet: View {
         self.listing = listing
         self._selection = selection
         let metadata = listing.metadata
-        _name = State(initialValue: metadata.name)
+        _name = State(initialValue: listing.name)
         _cpuCount = State(initialValue: metadata.cpuCount)
         _memoryGB = State(initialValue: max(1, Int(metadata.memorySizeInBytes / 1_073_741_824)))
         // Match the stored resolution to a preset, or synthesize a one-off entry so the picker
@@ -74,14 +74,13 @@ struct EditVMSheet: View {
                     }
 
                     LabeledContent {
-                        TextField(text: $name, prompt: Text(listing.metadata.name)) {
+                        TextField(text: $name, prompt: Text(listing.name)) {
                             Text("Name")
                         }
                         .labelsHidden()
                         .onChange(of: name) { _, newValue in
-                            if newValue.count > VMMetadata.maxNameLength {
-                                name = String(newValue.prefix(VMMetadata.maxNameLength))
-                            }
+                            let sanitized = VMMetadata.sanitizedInput(newValue)
+                            if sanitized != newValue { name = sanitized }
                         }
                     } label: {
                         Label("Name", systemImage: "tag")
@@ -178,14 +177,13 @@ struct EditVMSheet: View {
 
     private var resolvedName: String {
         let trimmed = name.trimmingCharacters(in: .whitespacesAndNewlines)
-        return trimmed.isEmpty ? listing.metadata.name : trimmed
+        return trimmed.isEmpty ? listing.name : trimmed
     }
 
     // MARK: - Actions
 
     private func save() {
         var metadata = listing.metadata
-        metadata.name = resolvedName
         metadata.cpuCount = cpuCount
         metadata.memorySizeInBytes = UInt64(memoryGB) * 1_073_741_824
         metadata.displayWidthInPixels = resolution.widthInPixels
@@ -193,13 +191,16 @@ struct EditVMSheet: View {
         metadata.pixelsPerInch = resolution.pixelsPerInch
         metadata.dynamicResolution = dynamicResolution
         do {
-            let updated = try library.update(listing, metadata: metadata)
+            // Rename first: it's the only step that can fail on a name collision, and doing it before
+            // writing config leaves nothing to unwind if it throws. A no-op rename returns `listing`.
+            let renamed = try library.rename(listing, to: resolvedName)
+            try library.update(renamed, metadata: metadata)
             // Drop any cached instance so the next launch rebuilds from the edited config (e.g.
             // adding/removing the pointing device). Safe because editing only happens while stopped.
             runner.forget(listing.id)
             // A rename changes the bundle URL — the VM's identity — so follow it in the sidebar.
-            if updated.id != listing.id {
-                selection = updated.id
+            if renamed.id != listing.id {
+                selection = renamed.id
             }
             dismiss()
         } catch {

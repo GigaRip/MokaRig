@@ -28,9 +28,11 @@ final class MacInstaller {
     private var progressObservation: NSKeyValueObservation?
 
     /// Loads the restore image, provisions the bundle, and runs the installer to completion.
+    /// - Returns: The new VM's bundle identity on success, so the caller can select it; nil on failure.
+    @discardableResult
     func install(name: String, cpuCount: Int, memoryBytes: UInt64, diskBytes: UInt64,
                  displayWidth: Int, displayHeight: Int, displayPixelsPerInch: Int,
-                 dynamicResolution: Bool, ipswURL: URL, into library: VMLibrary) async {
+                 dynamicResolution: Bool, ipswURL: URL, into library: VMLibrary) async -> VMBundle.ID? {
         phase = .preparing
         do {
             let restoreImage = try await VZMacOSRestoreImage.image(from: ipswURL)
@@ -51,7 +53,6 @@ final class MacInstaller {
                                           hardwareModel: hardwareModel, options: [])
 
             var metadata = VMMetadata.defaultMac
-            metadata.name = name
             metadata.cpuCount = max(cpuCount, requirements.minimumSupportedCPUCount)
             metadata.memorySizeInBytes = max(memoryBytes, requirements.minimumSupportedMemorySize)
             metadata.displayWidthInPixels = displayWidth
@@ -92,10 +93,12 @@ final class MacInstaller {
             try bundle.save(metadata)
             library.reload()
             phase = .finished
+            return bundle.id
         } catch {
             progressObservation = nil
             logInstallFailure(error)
             phase = .failed(installFailureMessage(error))
+            return nil
         }
     }
 

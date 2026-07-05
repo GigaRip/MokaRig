@@ -26,7 +26,7 @@ struct ContentView: View {
                 ForEach(library.machines) { listing in
                     Label {
                         VStack(alignment: .leading, spacing: 2) {
-                            Text(listing.metadata.name)
+                            Text(listing.name)
                             Text(listing.metadata.guestOS.displayName)
                                 .font(.caption)
                                 .foregroundStyle(.secondary)
@@ -73,7 +73,7 @@ struct ContentView: View {
             }
         }
         .sheet(isPresented: $isPresentingNewVM) {
-            NewVMSheet()
+            NewVMSheet(selection: $selection)
         }
         .cannotStartCloneAlert(isPresented: $isBlockedBySibling,
                                vmName: blockedVMName, runningSiblingName: blockingSiblingName)
@@ -87,8 +87,8 @@ struct ContentView: View {
         if !runner.isActive(listing.id) {
             // Don't start a clone while a VM it shares an identity with is already running.
             if let running = library.cloneSiblings(of: listing).first(where: { runner.isActive($0.id) }) {
-                blockedVMName = listing.metadata.name
-                blockingSiblingName = running.metadata.name
+                blockedVMName = listing.name
+                blockingSiblingName = running.name
                 isBlockedBySibling = true
                 return
             }
