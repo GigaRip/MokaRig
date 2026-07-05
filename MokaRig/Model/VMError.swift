@@ -16,6 +16,7 @@ enum VMError: LocalizedError {
     case installerMediaMissing
     case unsupportedHardwareModel
     case configurationInvalid(String)
+    case duplicateFailed(String)
 
     var errorDescription: String? {
         switch self {
@@ -29,6 +30,8 @@ enum VMError: LocalizedError {
             return "This Mac can't run the selected macOS configuration."
         case .configurationInvalid(let reason):
             return "The virtual machine configuration is invalid: \(reason)"
+        case .duplicateFailed(let reason):
+            return "The virtual machine couldn't be duplicated: \(reason)"
         }
     }
 }

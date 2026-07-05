@@ -59,6 +59,7 @@ final class MacInstaller {
             metadata.pixelsPerInch = displayPixelsPerInch
             metadata.dynamicResolution = dynamicResolution
             metadata.needsInstall = true
+            metadata.cloneGroup = UUID()
             try bundle.save(metadata)
 
             let platform = VZMacPlatformConfiguration()

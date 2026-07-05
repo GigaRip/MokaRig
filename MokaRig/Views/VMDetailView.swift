@@ -23,6 +23,10 @@ struct VMDetailView: View {
     @State private var isConfirmingEject = false
     @State private var isConfirmingForceStop = false
     @State private var isPresentingEdit = false
+    @State private var isPresentingDuplicate = false
+    @State private var isConfirmingIndependent = false
+    @State private var isBlockedBySibling = false
+    @State private var blockingSiblingName = ""
 
     var body: some View {
         let metadata = listing.metadata
@@ -49,31 +53,53 @@ struct VMDetailView: View {
             Section("Status") {
                 detailRow("State", value: runStateDescription, systemImage: runStateSymbol)
             }
-            // Installer controls for a Linux VM: eject the attached installer, or re-attach it if it
-            // was ejected but its media file is still around. The installer file itself is untouched.
-            // (The installer auto-ejects on power-off once the disk shows a guest OS was installed.)
-            if metadata.guestOS == .linux, let mediaPath = metadata.installerMediaPath {
-                let mediaExists = FileManager.default.fileExists(atPath: mediaPath)
-                if metadata.needsInstall || mediaExists {
-                    Section("Installer") {
-                        detailRow("Media", value: URL(fileURLWithPath: mediaPath).lastPathComponent,
-                                  systemImage: "opticaldisc")
-                        // Attaching/ejecting is a boot-time change, so only allow it while stopped.
-                        if metadata.needsInstall {
-                            Button {
-                                isConfirmingEject = true
-                            } label: {
-                                Label("Eject Installer", systemImage: "eject")
-                            }
-                            .disabled(isActive)
-                        } else {
-                            Button {
-                                try? library.reattachInstaller(listing)
-                            } label: {
-                                Label("Reattach Installer", systemImage: "opticaldisc")
-                            }
-                            .disabled(isActive)
+            // Shown only while the VM still has clone siblings: explains the shared-identity guard
+            // and how to lift it. Keyed on siblings, not just the group ID, so a lone leftover group
+            // (e.g. after every copy was made independent) doesn't linger in the UI. Placed above the
+            // installer since it's the more actionable state (the installer manages itself).
+            if !library.cloneSiblings(of: listing).isEmpty {
+                Section("Shared Identity") {
+                    Label {
+                        VStack(alignment: .leading, spacing: 10) {
+                            Text("This virtual machine shares its guest OS identity with another virtual machine. MokaRig won't run both at once until one of them is made independent.")
+                            Text("Give this virtual machine its own identity from inside the guest OS, then make it independent:")
                         }
+                        .font(.callout)
+                        .foregroundStyle(.secondary)
+                    } icon: {
+                        Image(systemName: "person.2")
+                    }
+                    Button {
+                        isConfirmingIndependent = true
+                    } label: {
+                        Label("Make Independent…", systemImage: "person.crop.circle.badge.checkmark")
+                    }
+                }
+            }
+            // Installer controls for a Linux VM: eject the attached installer, or re-attach it if it
+            // was ejected. Hidden once the media file is gone — there's nothing to show or reattach.
+            // The installer file itself is never touched. (It also auto-ejects on power-off once the
+            // disk shows a guest OS was installed.)
+            if metadata.guestOS == .linux, let mediaPath = metadata.installerMediaPath,
+               FileManager.default.fileExists(atPath: mediaPath) {
+                Section("Installer") {
+                    detailRow("Media", value: URL(fileURLWithPath: mediaPath).lastPathComponent,
+                              systemImage: "opticaldisc")
+                    // Attaching/ejecting is a boot-time change, so only allow it while stopped.
+                    if metadata.needsInstall {
+                        Button {
+                            isConfirmingEject = true
+                        } label: {
+                            Label("Eject Installer", systemImage: "eject")
+                        }
+                        .disabled(isActive)
+                    } else {
+                        Button {
+                            try? library.reattachInstaller(listing)
+                        } label: {
+                            Label("Reattach Installer", systemImage: "opticaldisc")
+                        }
+                        .disabled(isActive)
                     }
                 }
             }
@@ -99,8 +125,13 @@ struct VMDetailView: View {
                     }
                 } else {
                     Button {
-                        runner.start(listing)
-                        openWindow(id: MokaRigApp.runnerWindowID, value: listing.bundle.url)
+                        if let running = library.cloneSiblings(of: listing).first(where: { runner.isActive($0.id) }) {
+                            blockingSiblingName = running.metadata.name
+                            isBlockedBySibling = true
+                        } else {
+                            runner.start(listing)
+                            openWindow(id: MokaRigApp.runnerWindowID, value: listing.bundle.url)
+                        }
                     } label: {
                         Label("Run", systemImage: "play.fill")
                     }
@@ -116,6 +147,13 @@ struct VMDetailView: View {
                     isPresentingEdit = true
                 } label: {
                     Label("Edit", systemImage: "square.and.pencil")
+                }
+                .disabled(isActive)
+
+                Button {
+                    isPresentingDuplicate = true
+                } label: {
+                    Label("Duplicate", systemImage: "plus.square.on.square")
                 }
                 .disabled(isActive)
 
@@ -168,6 +206,19 @@ struct VMDetailView: View {
         } message: {
             Text("Unsaved work in the guest may be lost — this is like pulling the plug.")
         }
+        .sheet(isPresented: $isPresentingDuplicate) {
+            DuplicateVMSheet(listing: listing, selection: $selection)
+        }
+        .confirmationDialog("Make “\(metadata.name)” independent?",
+                            isPresented: $isConfirmingIndependent, titleVisibility: .visible) {
+            Button("Make Independent") {
+                try? library.makeIndependent(listing)
+            }
+        } message: {
+            Text("Do this only after giving the guest OS its own identity. MokaRig will then let it run at the same time as the other virtual machine.")
+        }
+        .cannotStartCloneAlert(isPresented: $isBlockedBySibling,
+                               vmName: metadata.name, runningSiblingName: blockingSiblingName)
     }
 
     // MARK: - Rows

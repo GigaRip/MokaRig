@@ -7,8 +7,10 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // -----------------------------------------------------------------------------
 
+import Darwin
 import Foundation
 import Observation
+import Virtualization
 
 /// A discovered virtual machine: its bundle plus decoded metadata.
 struct VMListing: Identifiable, Hashable, Sendable {
@@ -53,9 +55,16 @@ final class VMLibrary {
             .filter { $0.pathExtension == VMBundle.fileExtension }
             .compactMap { url in
                 let bundle = VMBundle(url: url)
-                guard let metadata = try? bundle.loadMetadata() else { return nil }
+                guard var metadata = try? bundle.loadMetadata() else { return nil }
                 // Fix up bundles created before the hidden-extension flag was applied.
                 try? bundle.hideFileExtension()
+                // Every VM needs a lineage ID. Backfill bundles created before the field existed, and
+                // persist it — so a later Finder copy of this bundle inherits the ID and is recognized
+                // as a copy (guarded), just like one made through Duplicate.
+                if metadata.cloneGroup == nil {
+                    metadata.cloneGroup = UUID()
+                    try? bundle.save(metadata)
+                }
                 return VMListing(bundle: bundle, metadata: metadata)
             }
             .sorted { $0.metadata.name.localizedCaseInsensitiveCompare($1.metadata.name) == .orderedAscending }
@@ -103,6 +112,7 @@ final class VMLibrary {
         metadata.dynamicResolution = dynamicResolution
         metadata.needsInstall = true
         metadata.installerMediaPath = installerISO.path
+        metadata.cloneGroup = UUID()
         try bundle.save(metadata)
 
         reload()
@@ -129,6 +139,86 @@ final class VMLibrary {
         let targetPath = bundle.url.standardizedFileURL.path
         return machines.first { $0.bundle.url.standardizedFileURL.path == targetPath }
             ?? VMListing(bundle: bundle, metadata: metadata)
+    }
+
+    /// Duplicates a VM into a new, independent bundle and returns its listing.
+    ///
+    /// The bundle is cloned with APFS copy-on-write, so the copy is near-instant and uses no extra
+    /// disk until the two VMs diverge; on a non-APFS or cross-volume location it falls back to a full
+    /// copy. The duplicate is then given a fresh machine identifier so it isn't the same machine as
+    /// the original to the network and the guest OS. The MAC address needs no attention — it isn't
+    /// persisted; Virtualization assigns a new random one each time a VM is configured.
+    ///
+    /// The source VM must be stopped so its disk image is copied in a consistent state.
+    @discardableResult
+    func duplicate(_ listing: VMListing, newName: String) throws -> VMListing {
+        let trimmed = newName.trimmingCharacters(in: .whitespacesAndNewlines)
+        let resolvedName = trimmed.isEmpty
+            ? "\(listing.metadata.name) copy"
+            : String(trimmed.prefix(VMMetadata.maxNameLength))
+        let source = listing.bundle.url
+        let destination = availableBundleURL(forName: resolvedName)
+        // The duplicate shares the source's lineage ID — the same way a Finder copy of the bundle
+        // would inherit it — so MokaRig keeps them from running at once until one is made independent.
+        let group = listing.metadata.cloneGroup ?? UUID()
+
+        // COPYFILE_CLONE makes an APFS copy-on-write clone when possible and transparently falls back
+        // to a byte copy otherwise. It requires the destination not to exist, which availableBundleURL
+        // guarantees.
+        let flags = copyfile_flags_t(COPYFILE_CLONE | COPYFILE_RECURSIVE)
+        guard copyfile(source.path, destination.path, nil, flags) == 0 else {
+            throw VMError.duplicateFailed(String(cString: strerror(errno)))
+        }
+
+        let newBundle = VMBundle(url: destination)
+        try? newBundle.hideFileExtension()
+        try regenerateMachineIdentity(for: newBundle, guestOS: listing.metadata.guestOS)
+
+        var metadata = listing.metadata
+        metadata.name = resolvedName
+        metadata.cloneGroup = group
+        try newBundle.save(metadata)
+
+        reload()
+        let targetPath = destination.standardizedFileURL.path
+        return machines.first { $0.bundle.url.standardizedFileURL.path == targetPath }
+            ?? VMListing(bundle: newBundle, metadata: metadata)
+    }
+
+    /// Declares that a VM now has its own guest identity, so MokaRig will run it alongside the VMs it
+    /// was copied with. It's the user's attestation that they gave the guest a unique hostname,
+    /// machine-id, and SSH host keys. Assigns a fresh lineage ID (keeping the "every VM has one"
+    /// invariant) and regenerates the machine identifier — the latter matters for a Finder copy, which
+    /// shares the original's identifier, and is harmless for a Duplicate, which already has a fresh one.
+    func makeIndependent(_ listing: VMListing) throws {
+        var metadata = listing.metadata
+        metadata.cloneGroup = UUID()
+        try listing.bundle.save(metadata)
+        try? regenerateMachineIdentity(for: listing.bundle, guestOS: metadata.guestOS)
+        reload()
+    }
+
+    /// The other VMs that are copies of this one — they share its lineage ID. Empty when this VM has
+    /// no copies (the common case), so nothing about it is guarded.
+    func cloneSiblings(of listing: VMListing) -> [VMListing] {
+        guard let group = listing.metadata.cloneGroup else { return [] }
+        return machines.filter { $0.id != listing.id && $0.metadata.cloneGroup == group }
+    }
+
+    /// Replaces a bundle's machine identifier so a copy has its own hardware identity rather than
+    /// sharing the original's.
+    private func regenerateMachineIdentity(for bundle: VMBundle, guestOS: GuestOS) throws {
+        switch guestOS {
+        case .linux:
+            // A Linux guest lazily creates its VZGenericMachineIdentifier on first boot, so removing
+            // the copied file is enough — the next launch writes a fresh one.
+            try? FileManager.default.removeItem(at: bundle.machineIdentifierURL)
+        case .macOS:
+            // A macOS guest requires the identifier to be present to build its platform, so write a
+            // new one now.
+            let identifier = VZMacMachineIdentifier()
+            try identifier.dataRepresentation.write(to: bundle.machineIdentifierURL, options: .atomic)
+        }
     }
 
     /// Stops attaching the installer media on future boots (the VM boots from its disk instead).

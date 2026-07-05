@@ -16,6 +16,9 @@ struct ContentView: View {
     @Environment(\.openWindow) private var openWindow
     @State private var selection: VMBundle.ID?
     @State private var isPresentingNewVM = false
+    @State private var isBlockedBySibling = false
+    @State private var blockedVMName = ""
+    @State private var blockingSiblingName = ""
 
     var body: some View {
         NavigationSplitView {
@@ -72,6 +75,8 @@ struct ContentView: View {
         .sheet(isPresented: $isPresentingNewVM) {
             NewVMSheet()
         }
+        .cannotStartCloneAlert(isPresented: $isBlockedBySibling,
+                               vmName: blockedVMName, runningSiblingName: blockingSiblingName)
     }
 
     /// Opens (or focuses) the window for the VM at the given sidebar row, starting it if it isn't
@@ -80,6 +85,13 @@ struct ContentView: View {
         guard library.machines.indices.contains(index) else { return }
         let listing = library.machines[index]
         if !runner.isActive(listing.id) {
+            // Don't start a clone while a VM it shares an identity with is already running.
+            if let running = library.cloneSiblings(of: listing).first(where: { runner.isActive($0.id) }) {
+                blockedVMName = listing.metadata.name
+                blockingSiblingName = running.metadata.name
+                isBlockedBySibling = true
+                return
+            }
             runner.start(listing)
         }
         openWindow(id: MokaRigApp.runnerWindowID, value: listing.bundle.url)
