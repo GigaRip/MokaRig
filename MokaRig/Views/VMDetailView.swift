@@ -62,7 +62,7 @@ struct VMDetailView: View {
                     Label {
                         VStack(alignment: .leading, spacing: 10) {
                             Text("This virtual machine shares its guest OS identity with another virtual machine. MokaRig won't run both at the same time until one of them is made independent.")
-                            Text("Give this virtual machine its own identity from inside the guest OS, then make it independent:")
+                            Text("Give this virtual machine its own identity from inside the guest OS, then make it independent.")
                         }
                         .font(.callout)
                         .foregroundStyle(.secondary)
