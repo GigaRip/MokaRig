@@ -15,6 +15,8 @@ struct ContentView: View {
     @Environment(VMRunner.self) private var runner
     @Environment(\.openWindow) private var openWindow
     @State private var selection: VMBundle.ID?
+    /// The selected VM's bundle URL, persisted so the sidebar restores to it on the next launch.
+    @SceneStorage("selectedVMBundleURL") private var persistedSelection = ""
     @State private var isPresentingNewVM = false
     @State private var isBlockedBySibling = false
     @State private var blockedVMName = ""
@@ -77,6 +79,22 @@ struct ContentView: View {
         }
         .cannotStartCloneAlert(isPresented: $isBlockedBySibling,
                                vmName: blockedVMName, runningSiblingName: blockingSiblingName)
+        .onAppear(perform: restoreSelection)
+        .onChange(of: selection) { _, newValue in
+            if let newValue { persistedSelection = newValue.absoluteString }
+        }
+    }
+
+    /// Picks the initial sidebar selection on launch: the persisted VM if it still exists, otherwise
+    /// the sole VM when there's exactly one, otherwise nothing (the placeholder). Never overrides a
+    /// selection the user has already made this session.
+    private func restoreSelection() {
+        guard selection == nil else { return }
+        if let saved = URL(string: persistedSelection), library.listing(for: saved) != nil {
+            selection = saved
+        } else if library.machines.count == 1 {
+            selection = library.machines.first?.id
+        }
     }
 
     /// Opens (or focuses) the window for the VM at the given sidebar row, starting it if it isn't

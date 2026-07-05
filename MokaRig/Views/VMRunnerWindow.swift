@@ -188,11 +188,18 @@ private struct VMRunnerContent: View {
     @ViewBuilder private func statusOverlay(for state: VMRunState) -> some View {
         switch state {
         case .stopped:
-            ContentUnavailableView(
-                "Powered Off",
-                systemImage: "power",
-                description: Text("This virtual machine isn’t running. Press Start in the toolbar to boot it."))
-                .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 16))
+            // The builder form plus fixedSize overrides ContentUnavailableView's narrow description
+            // column, which would otherwise wrap this short sentence. fixedSize is applied to the whole
+            // view (not just the Text) so its frame — and the material background — grows to fit the
+            // one-line description instead of letting the text spill outside the card.
+            ContentUnavailableView {
+                Label("Powered Off", systemImage: "power")
+            } description: {
+                Text("This virtual machine isn’t running.\n\nPress Start \(Image(systemName: "play.circle")) in the toolbar to boot it.")
+            }
+            .fixedSize()
+            .padding(.horizontal, 24)
+            .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 16))
         case .starting:
             ProgressView("Starting…")
                 .padding()

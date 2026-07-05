@@ -93,7 +93,10 @@ final class MacInstaller {
             try bundle.save(metadata)
             library.reload()
             phase = .finished
-            return bundle.id
+            // Return the reloaded row's identity, not the constructed URL — they normalize differently
+            // (directory flag, trailing slash), and a mismatch would break sidebar selection.
+            let targetPath = bundle.url.standardizedFileURL.path
+            return library.machines.first { $0.bundle.url.standardizedFileURL.path == targetPath }?.id ?? bundle.id
         } catch {
             progressObservation = nil
             logInstallFailure(error)

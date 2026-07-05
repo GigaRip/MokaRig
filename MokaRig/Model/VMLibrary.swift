@@ -117,7 +117,12 @@ final class VMLibrary {
         try bundle.save(metadata)
 
         reload()
-        return VMListing(bundle: bundle, metadata: metadata)
+        // Return the reloaded listing so its identity matches the entries in `machines` — a freshly
+        // constructed URL normalizes differently (directory flag, trailing slash) than the ones the
+        // file system hands back, which would break sidebar selection.
+        let targetPath = bundle.url.standardizedFileURL.path
+        return machines.first { $0.bundle.url.standardizedFileURL.path == targetPath }
+            ?? VMListing(bundle: bundle, metadata: metadata)
     }
 
     /// Writes updated metadata for an existing VM and rescans. The VM's name lives in its folder name,
