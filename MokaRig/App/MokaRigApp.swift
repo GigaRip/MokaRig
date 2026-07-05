@@ -40,8 +40,6 @@ struct MokaRigApp: App {
 			CommandGroup(after: .appInfo) {
 				CheckForUpdatesView(updater: updaterController.updater)
 			}
-			// The sidebar is pinned open, so drop the View menu's Hide/Show Sidebar command.
-			CommandGroup(replacing: .sidebar) { }
 		}
 		.defaultSize(width: 820, height: 700)
 
