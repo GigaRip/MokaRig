@@ -7,14 +7,14 @@ assignees:
 body:
   - type: markdown
     attributes:
-      value: Thanks for taking the time to report a bug. Please include screenshots or screen recordings, if possible.
+      value: Thanks for taking the time to report a bug! Please include screenshots or screen recordings, if possible.
 
   - type: input
     id: mokarig-version
     attributes:
       label: MokaRig version
       description: Found in MokaRig → About MokaRig
-      placeholder: "1.2.0 (145)"
+      placeholder: "x.x.x (xxxxxxxxxx)"
     validations:
       required: true
 
@@ -31,8 +31,8 @@ body:
     attributes:
       label: Guest OS
       options:
-        - macOS
         - Linux
+        - macOS
         - N/A
     validations:
       required: true
@@ -41,7 +41,7 @@ body:
     id: what-happened
     attributes:
       label: What happened?
-      description: What did you expect to happen instead?
+      description: Describe what happened and what you expected to happen.
     validations:
       required: true
 

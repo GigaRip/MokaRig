@@ -42,7 +42,7 @@ struct MokaRigApp: App {
 			}
 			// Replace the default (help-book-less) Help item with a link to file an issue on GitHub.
 			CommandGroup(replacing: .help) {
-				if let url = URL(string: "https://github.com/GigaRip/MokaRig/issues/new") {
+				if let url = URL(string: "https://github.com/GigaRip/MokaRig/issues/new?template=bug_report.yml") {
 					Link("Report a Bug…", destination: url)
 				}
 			}
