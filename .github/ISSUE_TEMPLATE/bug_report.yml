@@ -53,9 +53,3 @@ body:
         1.
         2.
         3.
-
-  - type: textarea
-    id: logs
-    attributes:
-      label: Relevant log output
-      render: shell
