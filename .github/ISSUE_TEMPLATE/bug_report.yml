@@ -1,0 +1,61 @@
+name: Bug Report
+description: Report a problem with MokaRig
+title: "[Bug]: "
+labels: ["bug"]
+assignees:
+  - softwarenerd
+body:
+  - type: markdown
+    attributes:
+      value: Thanks for taking the time to report a bug. Please include screenshots or screen recordings, if possible.
+
+  - type: input
+    id: mokarig-version
+    attributes:
+      label: MokaRig version
+      description: Found in MokaRig → About MokaRig
+      placeholder: "1.2.0 (145)"
+    validations:
+      required: true
+
+  - type: input
+    id: macos-version
+    attributes:
+      label: macOS version (host)
+      placeholder: "26.5.1 (25F73)"
+    validations:
+      required: true
+
+  - type: dropdown
+    id: guest-os
+    attributes:
+      label: Guest OS
+      options:
+        - macOS
+        - Linux
+        - N/A
+    validations:
+      required: true
+
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened?
+      description: What did you expect to happen instead?
+    validations:
+      required: true
+
+  - type: textarea
+    id: repro
+    attributes:
+      label: Steps to reproduce
+      value: |
+        1.
+        2.
+        3.
+
+  - type: textarea
+    id: logs
+    attributes:
+      label: Relevant log output
+      render: shell

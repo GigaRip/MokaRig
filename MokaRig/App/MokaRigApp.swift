@@ -40,6 +40,12 @@ struct MokaRigApp: App {
 			CommandGroup(after: .appInfo) {
 				CheckForUpdatesView(updater: updaterController.updater)
 			}
+			// Replace the default (help-book-less) Help item with a link to file an issue on GitHub.
+			CommandGroup(replacing: .help) {
+				if let url = URL(string: "https://github.com/GigaRip/MokaRig/issues/new") {
+					Link("Report a Bug…", destination: url)
+				}
+			}
 		}
 		.defaultSize(width: 820, height: 700)
 
