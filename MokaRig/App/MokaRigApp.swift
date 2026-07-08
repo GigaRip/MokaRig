@@ -12,14 +12,14 @@ import Sparkle
 
 @main
 struct MokaRigApp: App {
-    /// The shared library of virtual machines, discovered on disk.
-    @State private var library = VMLibrary()
+	/// The shared library of virtual machines, discovered on disk.
+	@State private var library = VMLibrary()
 
-    /// The shared registry of live VM instances, so run state is visible across windows.
-    @State private var runner = VMRunner()
+	/// The shared registry of live VM instances, so run state is visible across windows.
+	@State private var runner = VMRunner()
 
-    /// The identifier of the auxiliary window used to run and display a single VM.
-    static let runnerWindowID = "vm-runner"
+	/// The identifier of the auxiliary window used to run and display a single VM.
+	static let runnerWindowID = "vm-runner"
 
 	/// Drives in-app auto-updates via Sparkle. Held for the app's lifetime so the updater keeps
 	/// running; `startingUpdater: true` begins checking for updates at launch.
@@ -30,12 +30,12 @@ struct MokaRigApp: App {
 	)
 
 	var body: some Scene {
-        WindowGroup {
-            ContentView()
-                .environment(library)
-                .environment(runner)
-                .frame(minWidth: 720, minHeight: 460)
-        }
+		WindowGroup {
+			ContentView()
+				.environment(library)
+				.environment(runner)
+				.frame(minWidth: 720, minHeight: 460)
+		}
 		.commands {
 			CommandGroup(after: .appInfo) {
 				CheckForUpdatesView(updater: updaterController.updater)
@@ -49,15 +49,15 @@ struct MokaRigApp: App {
 		}
 		.defaultSize(width: 820, height: 700)
 
-        // A dedicated window per running VM, keyed by the VM bundle's URL.
-        // Runner windows are transient, so don't restore them at launch — otherwise the
-        // app can reopen a VM window instead of the main library window.
-        WindowGroup(id: MokaRigApp.runnerWindowID, for: URL.self) { $bundleURL in
-            VMRunnerWindow(bundleURL: bundleURL)
-                .environment(library)
-                .environment(runner)
-        }
-        .restorationBehavior(.disabled)
-        .defaultSize(width: 1280, height: 800)
-    }
+		// A dedicated window per running VM, keyed by the VM bundle's URL.
+		// Runner windows are transient, so don't restore them at launch — otherwise the
+		// app can reopen a VM window instead of the main library window.
+		WindowGroup(id: MokaRigApp.runnerWindowID, for: URL.self) { $bundleURL in
+			VMRunnerWindow(bundleURL: bundleURL)
+				.environment(library)
+				.environment(runner)
+		}
+		.restorationBehavior(.disabled)
+		.defaultSize(width: 1280, height: 800)
+	}
 }

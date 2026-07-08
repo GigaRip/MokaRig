@@ -15,48 +15,48 @@ import Observation
 @MainActor
 @Observable
 final class VMRunner {
-    private(set) var instances: [VMBundle.ID: VMInstance] = [:]
+	private(set) var instances: [VMBundle.ID: VMInstance] = [:]
 
-    /// The live instance for a VM, if one has been created.
-    func liveInstance(for id: VMBundle.ID) -> VMInstance? {
-        instances[id]
-    }
+	/// The live instance for a VM, if one has been created.
+	func liveInstance(for id: VMBundle.ID) -> VMInstance? {
+		instances[id]
+	}
 
-    /// Returns the instance for a listing, creating (but not starting) one if needed.
-    /// Call from actions or lifecycle callbacks, not during view body evaluation.
-    @discardableResult
-    func makeInstance(for listing: VMListing) -> VMInstance {
-        if let existing = instances[listing.id] { return existing }
-        let instance = VMInstance(listing: listing)
-        instances[listing.id] = instance
-        return instance
-    }
+	/// Returns the instance for a listing, creating (but not starting) one if needed.
+	/// Call from actions or lifecycle callbacks, not during view body evaluation.
+	@discardableResult
+	func makeInstance(for listing: VMListing) -> VMInstance {
+		if let existing = instances[listing.id] { return existing }
+		let instance = VMInstance(listing: listing)
+		instances[listing.id] = instance
+		return instance
+	}
 
-    /// Creates the instance if needed and starts the VM.
-    func start(_ listing: VMListing) {
-        makeInstance(for: listing).start()
-    }
+	/// Creates the instance if needed and starts the VM.
+	func start(_ listing: VMListing) {
+		makeInstance(for: listing).start()
+	}
 
-    /// Asks the guest to shut down gracefully, if it has a live instance.
-    func requestStop(_ id: VMBundle.ID) {
-        instances[id]?.requestStop()
-    }
+	/// Asks the guest to shut down gracefully, if it has a live instance.
+	func requestStop(_ id: VMBundle.ID) {
+		instances[id]?.requestStop()
+	}
 
-    /// Forces the VM to power off, if it has a live instance.
-    func forceStop(_ id: VMBundle.ID) {
-        instances[id]?.forceStop()
-    }
+	/// Forces the VM to power off, if it has a live instance.
+	func forceStop(_ id: VMBundle.ID) {
+		instances[id]?.forceStop()
+	}
 
-    /// Drops the instance for a VM, e.g. after its bundle is renamed to a new identity.
-    func forget(_ id: VMBundle.ID) {
-        instances[id] = nil
-    }
+	/// Drops the instance for a VM, e.g. after its bundle is renamed to a new identity.
+	func forget(_ id: VMBundle.ID) {
+		instances[id] = nil
+	}
 
-    /// Whether the VM is doing anything other than sitting stopped or failed.
-    func isActive(_ id: VMBundle.ID) -> Bool {
-        switch instances[id]?.state {
-        case .none, .stopped, .failed: return false
-        default: return true
-        }
-    }
+	/// Whether the VM is doing anything other than sitting stopped or failed.
+	func isActive(_ id: VMBundle.ID) -> Bool {
+		switch instances[id]?.state {
+		case .none, .stopped, .failed: return false
+		default: return true
+		}
+	}
 }
