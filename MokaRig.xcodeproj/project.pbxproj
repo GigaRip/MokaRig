@@ -11,7 +11,6 @@
 		D360E4682FFA392000494AC0 /* CONTRIBUTING.md in Resources */ = {isa = PBXBuildFile; fileRef = D360E4652FFA392000494AC0 /* CONTRIBUTING.md */; };
 		D360E4692FFA392000494AC0 /* LICENSE-APACHE in Resources */ = {isa = PBXBuildFile; fileRef = D360E4662FFA392000494AC0 /* LICENSE-APACHE */; };
 		D360E46A2FFA392000494AC0 /* LICENSE-MIT in Resources */ = {isa = PBXBuildFile; fileRef = D360E4672FFA392000494AC0 /* LICENSE-MIT */; };
-		D360E4722FFA429A00494AC0 /* macos-26.5-vm-install-bug.md in Resources */ = {isa = PBXBuildFile; fileRef = D360E4712FFA429A00494AC0 /* macos-26.5-vm-install-bug.md */; };
 		D366E0242FFA039000F7B129 /* release.sh in Resources */ = {isa = PBXBuildFile; fileRef = D366E0232FFA038800F7B129 /* release.sh */; };
 		D366E08B2FFA217300F7B129 /* Sparkle in Frameworks */ = {isa = PBXBuildFile; productRef = D366E08A2FFA217300F7B129 /* Sparkle */; };
 /* End PBXBuildFile section */
@@ -22,7 +21,6 @@
 		D360E4652FFA392000494AC0 /* CONTRIBUTING.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = CONTRIBUTING.md; sourceTree = "<group>"; };
 		D360E4662FFA392000494AC0 /* LICENSE-APACHE */ = {isa = PBXFileReference; lastKnownFileType = text; path = "LICENSE-APACHE"; sourceTree = "<group>"; };
 		D360E4672FFA392000494AC0 /* LICENSE-MIT */ = {isa = PBXFileReference; lastKnownFileType = text; path = "LICENSE-MIT"; sourceTree = "<group>"; };
-		D360E4712FFA429A00494AC0 /* macos-26.5-vm-install-bug.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = "macos-26.5-vm-install-bug.md"; sourceTree = "<group>"; };
 		D366E0232FFA038800F7B129 /* release.sh */ = {isa = PBXFileReference; lastKnownFileType = text.script.sh; path = release.sh; sourceTree = "<group>"; };
 		D3A036EC2FF9E91A00A5A9EF /* CLAUDE.md */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CLAUDE.md; sourceTree = "<group>"; };
 /* End PBXFileReference section */
@@ -69,7 +67,6 @@
 				000000000000000000000010 /* MokaRig */,
 				000000000000000000000020 /* Products */,
 				D360E4632FFA387500494AC0 /* README.md */,
-				D360E4712FFA429A00494AC0 /* macos-26.5-vm-install-bug.md */,
 			);
 			sourceTree = "<group>";
 		};
@@ -146,7 +143,6 @@
 		000000000000000140000000 /* Resources */ = {
 			isa = PBXResourcesBuildPhase;
 			files = (
-				D360E4722FFA429A00494AC0 /* macos-26.5-vm-install-bug.md in Resources */,
 				D366E0242FFA039000F7B129 /* release.sh in Resources */,
 				D360E4642FFA387500494AC0 /* README.md in Resources */,
 				D360E4682FFA392000494AC0 /* CONTRIBUTING.md in Resources */,

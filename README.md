@@ -8,14 +8,6 @@ A macOS virtual machine manager built on Apple's Virtualization framework. It ca
 create and run Linux virtual machines — such as Ubuntu Desktop and Ubuntu
 Server — as well as macOS virtual machines.
 
-> **Note:** Creating new macOS virtual machines currently fails on macOS
-> 26.5.x hosts due to an Apple platform bug in the guest restore path
-> (`VZErrorDomain` error 10007). Linux guests are unaffected, and existing
-> macOS VM bundles restored on older hosts run fine. See
-> [macos-26.5-vm-install-bug.md](macos-26.5-vm-install-bug.md) for the full
-> analysis and workarounds. This will be revisited once Apple resolves the
-> platform issue.
-
 ## Why MokaRig?
 
 There are plenty of virtualization apps for the Mac. MokaRig was built around a
