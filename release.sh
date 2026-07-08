@@ -23,6 +23,12 @@ NOTARY_PROFILE="mokarig-notary"
 BUCKET="mokarig-releases"
 PUBLIC_BASE="https://downloads.mokarig.com"
 RELEASES_DIR="$HOME/MokaRigReleases"
+# HiDPI-aware background for the DMG window. A single .tiff carrying both the
+# 540x360 and 1080x720 reps (built with `tiffutil -cathidpicheck`); Finder picks
+# the rep matching the display, so Retina Macs get the sharp 2x image. create-dmg
+# 1.3.0 copies whatever single file it's given, so the Retina rep must be baked
+# into this one file rather than left as a sibling @2x.png.
+BG_IMAGE="packaging/dmg-background.tiff"
 # ---------------------------------------------------------------------------
 
 # --- Resolve the target version against R2 (the source of truth) -----------
@@ -136,7 +142,9 @@ rm -f "$DMG"
 STAGING="$WORK/dmg-staging"
 mkdir -p "$STAGING"
 cp -R "$APP" "$STAGING/"
+[ -f "$BG_IMAGE" ] || { echo "error: DMG background '$BG_IMAGE' is missing"; exit 1; }
 create-dmg --volname "MokaRig" \
+	--background "$BG_IMAGE" \
 	--window-size 540 360 --icon-size 128 \
 	--icon "MokaRig.app" 130 160 \
 	--app-drop-link 400 160 \
