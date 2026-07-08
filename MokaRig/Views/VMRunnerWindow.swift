@@ -51,6 +51,8 @@ private struct VMRunnerContent: View {
 	@State private var isConfirmingForceStop = false
 	@State private var isConfirmingClose = false
 	@State private var closeConfirmed = false
+	/// Whether the guest currently holds keyboard focus (clicked into) versus the host (title bar).
+	@State private var keyboardCaptured = false
 	private static let compactTitleWidth: CGFloat = 1000
 
 	/// True when the window is too narrow for the centered spec chips.
@@ -62,6 +64,13 @@ private struct VMRunnerContent: View {
 	/// window distinct from the others and from the main window.
 	private var windowTitle: String {
 		listing.name
+	}
+
+	/// Tooltip for the keyboard-capture indicator, explaining which way input is currently routed.
+	private var keyboardHelp: String {
+		keyboardCaptured
+			? "Keyboard input is going to the virtual machine. Click the title bar to return control to the host."
+			: "Click inside the window to send keyboard input to the virtual machine."
 	}
 
 	var body: some View {
@@ -78,7 +87,8 @@ private struct VMRunnerContent: View {
 				if closeConfirmed || !runner.isActive(listing.id) { return true }
 				isConfirmingClose = true
 				return false
-			})
+			},
+			keyboardCaptured: $keyboardCaptured)
 			.background(.black)
 			.onGeometryChange(for: CGFloat.self) { $0.size.width } action: { contentWidth = $0 }
 			.navigationTitle(windowTitle)
@@ -102,6 +112,9 @@ private struct VMRunnerContent: View {
 								specChip(listing.metadata.dynamicResolution ? "Matches window" : "Fixed",
 										 systemImage: "arrow.up.left.and.arrow.down.right")
 							}
+							Image(systemName: keyboardCaptured ? "keyboard.fill" : "keyboard")
+								.foregroundStyle(keyboardCaptured ? AnyShapeStyle(.green) : AnyShapeStyle(.secondary))
+								.help(keyboardHelp)
 						}
 						.padding(.horizontal, 16)
 					}
@@ -141,11 +154,10 @@ private struct VMRunnerContent: View {
 				// auto-eject the installer so future boots come from the disk.
 				if newState == .stopped {
 					library.ejectInstallerIfInstalled(listing)
-					// A powered-off VM has nothing left to show, so close the window instead of
-					// leaving an empty shell — however it got here (guest shutdown, Shut Down, or
-					// Force Stop). onChange only fires on a real transition, so the brief stopped
-					// state at first mount (before onAppear starts the VM) won't close the window.
-					dismiss()
+					// Close only when the user powered off by closing the window (red X). A guest-
+					// initiated shutdown or a toolbar Stop leaves the window open on the Powered Off
+					// overlay so it can be restarted in place.
+					if closeConfirmed { dismiss() }
 				}
 			}
 			.confirmationDialog("Do you want to force “\(listing.name)” to power off?",
@@ -159,8 +171,8 @@ private struct VMRunnerContent: View {
 			.confirmationDialog("Do you want to force “\(listing.name)” to power off?",
 								isPresented: $isConfirmingClose, titleVisibility: .visible) {
 				Button("Force Stop", role: .destructive) {
-					runner.forceStop(listing.id)
 					closeConfirmed = true
+					runner.forceStop(listing.id)
 					dismiss()
 				}
 			} message: {

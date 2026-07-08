@@ -22,23 +22,27 @@ struct VirtualMachineHostView: NSViewRepresentable {
 	/// Called when the user tries to close the window (red X). Return true to allow the close,
 	/// false to veto it (e.g. to first show a confirmation).
 	var shouldClose: (() -> Bool)?
+	/// Reflects whether the guest currently holds keyboard focus: captured on a click inside the VM,
+	/// released by clicking the title bar or another window. Drives the runner window's input indicator.
+	@Binding var keyboardCaptured: Bool
 
 	/// The smallest content width the runner window may shrink to.
 	private static let minimumContentWidth: CGFloat = 560
 
 	func makeCoordinator() -> Coordinator { Coordinator() }
 
-	func makeNSView(context: Context) -> VZVirtualMachineView {
-		let view = VZVirtualMachineView()
+	func makeNSView(context: Context) -> CapturingVMView {
+		let view = CapturingVMView()
 		// Don't capture macOS system shortcuts (Command-Tab, Command-Space, etc.) — let them
 		// switch apps as usual instead of being swallowed by the guest.
 		view.capturesSystemKeys = false
 		return view
 	}
 
-	func updateNSView(_ nsView: VZVirtualMachineView, context: Context) {
+	func updateNSView(_ nsView: CapturingVMView, context: Context) {
 		context.coordinator.vmView = nsView
 		context.coordinator.shouldClose = shouldClose
+		nsView.onCaptureChange = { keyboardCaptured = $0 }
 		nsView.virtualMachine = virtualMachine
 		// Per-VM setting: either follow the window (dynamic) or keep a fixed guest resolution.
 		nsView.automaticallyReconfiguresDisplay = reconfiguresDisplayOnResize
@@ -63,7 +67,7 @@ struct VirtualMachineHostView: NSViewRepresentable {
 		private var minimumContentWidth: CGFloat = 800
 		private weak var forwardingDelegate: NSWindowDelegate?
 		/// The hosted VM view, so full-screen transitions can toggle system-key capture on it.
-		weak var vmView: VZVirtualMachineView?
+		weak var vmView: CapturingVMView?
 		/// Vetoes/permits the window close; supplied by the representable.
 		var shouldClose: (() -> Bool)?
 		private var didObserveFullScreen = false
@@ -116,7 +120,9 @@ struct VirtualMachineHostView: NSViewRepresentable {
 		// MARK: - Full-screen system-key capture
 
 		/// Capture macOS system shortcuts (⌘-Tab, ⌘-Space, etc.) only in full screen: windowed
-		/// mode stays out of the user's way, full screen hands everything to the guest.
+		/// mode stays out of the user's way, full screen hands everything to the guest. Full screen
+		/// also grabs keyboard focus outright — there's no title bar to click, so the click-to-capture
+		/// model would otherwise leave the guest unreachable.
 		private func observeFullScreen(of window: NSWindow) {
 			guard !didObserveFullScreen else { return }
 			didObserveFullScreen = true
@@ -124,12 +130,18 @@ struct VirtualMachineHostView: NSViewRepresentable {
 			fullScreenObservers.append(
 				center.addObserver(forName: NSWindow.didEnterFullScreenNotification,
 								   object: window, queue: .main) { [weak self] _ in
-					MainActor.assumeIsolated { self?.vmView?.capturesSystemKeys = true }
+					MainActor.assumeIsolated {
+						self?.vmView?.capturesSystemKeys = true
+						self?.vmView?.capture()
+					}
 				})
 			fullScreenObservers.append(
 				center.addObserver(forName: NSWindow.didExitFullScreenNotification,
 								   object: window, queue: .main) { [weak self] _ in
-					MainActor.assumeIsolated { self?.vmView?.capturesSystemKeys = false }
+					MainActor.assumeIsolated {
+						self?.vmView?.capturesSystemKeys = false
+						self?.vmView?.release()
+					}
 				})
 		}
 
@@ -167,5 +179,69 @@ struct VirtualMachineHostView: NSViewRepresentable {
 			}
 			return NSSize(width: max(width, minimumContentWidth).rounded(), height: height.rounded())
 		}
+	}
+}
+
+/// A `VZVirtualMachineView` that grabs keyboard focus for the guest only after the user clicks inside
+/// it. Activating the window any other way — ⌘`, the Window menu, another app — leaves focus with the
+/// host so host shortcuts keep working; clicking the title bar (or another window) hands control back.
+/// The gate is first-responder status: `acceptsFirstResponder` is false until a click asks for capture,
+/// so AppKit won't route keys (⌘` included) to the guest on plain window activation.
+final class CapturingVMView: VZVirtualMachineView {
+	/// Reports capture transitions so the UI can show whether the keyboard is going to the guest.
+	var onCaptureChange: ((Bool) -> Void)?
+
+	private var wantsCapture = false
+	private var releaseClickMonitor: Any?
+
+	override var acceptsFirstResponder: Bool { wantsCapture }
+
+	override func mouseDown(with event: NSEvent) {
+		capture()
+		super.mouseDown(with: event)
+	}
+
+	/// Gives the guest keyboard focus.
+	func capture() {
+		wantsCapture = true
+		if window?.firstResponder !== self { window?.makeFirstResponder(self) }
+	}
+
+	/// Returns keyboard focus to the host.
+	func release() {
+		wantsCapture = false
+		if window?.firstResponder === self { window?.makeFirstResponder(window) }
+	}
+
+	override func becomeFirstResponder() -> Bool {
+		let didBecome = super.becomeFirstResponder()
+		if didBecome { onCaptureChange?(true) }
+		return didBecome
+	}
+
+	override func resignFirstResponder() -> Bool {
+		let didResign = super.resignFirstResponder()
+		if didResign {
+			wantsCapture = false
+			onCaptureChange?(false)
+		}
+		return didResign
+	}
+
+	override func viewDidMoveToWindow() {
+		super.viewDidMoveToWindow()
+		guard releaseClickMonitor == nil else { return }
+		// A click anywhere in this window outside the VM view (title bar, toolbar) returns control to
+		// the host. Clicks inside the view capture via `mouseDown`. The event is passed through, so the
+		// title bar still drags and toolbar buttons still work.
+		releaseClickMonitor = NSEvent.addLocalMonitorForEvents(matching: [.leftMouseDown, .rightMouseDown]) { [weak self] event in
+			guard let self, self.wantsCapture, event.window === self.window else { return event }
+			if !self.bounds.contains(self.convert(event.locationInWindow, from: nil)) { self.release() }
+			return event
+		}
+	}
+
+	deinit {
+		if let releaseClickMonitor { NSEvent.removeMonitor(releaseClickMonitor) }
 	}
 }
