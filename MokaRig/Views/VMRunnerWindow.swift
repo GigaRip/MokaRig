@@ -88,7 +88,8 @@ private struct VMRunnerContent: View {
 				isConfirmingClose = true
 				return false
 			},
-			keyboardCaptured: $keyboardCaptured)
+			keyboardCaptured: $keyboardCaptured,
+			guestIsRunning: state == .running)
 			.background(.black)
 			.onGeometryChange(for: CGFloat.self) { $0.size.width } action: { contentWidth = $0 }
 			.navigationTitle(windowTitle)

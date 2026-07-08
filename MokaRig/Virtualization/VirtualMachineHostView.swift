@@ -25,6 +25,9 @@ struct VirtualMachineHostView: NSViewRepresentable {
 	/// Reflects whether the guest currently holds keyboard focus: captured on a click inside the VM,
 	/// released by clicking the title bar or another window. Drives the runner window's input indicator.
 	@Binding var keyboardCaptured: Bool
+	/// Whether the guest is running. When it isn't, any capture is released so focus returns to the host
+	/// and the indicator resets — a powered-off guest can't receive input.
+	var guestIsRunning: Bool
 
 	/// The smallest content width the runner window may shrink to.
 	private static let minimumContentWidth: CGFloat = 560
@@ -46,6 +49,12 @@ struct VirtualMachineHostView: NSViewRepresentable {
 		nsView.virtualMachine = virtualMachine
 		// Per-VM setting: either follow the window (dynamic) or keep a fixed guest resolution.
 		nsView.automaticallyReconfiguresDisplay = reconfiguresDisplayOnResize
+
+		// Drop any capture once the guest stops. Deferred so the resulting binding update doesn't
+		// mutate SwiftUI state from within this update pass.
+		if !guestIsRunning {
+			DispatchQueue.main.async { [weak nsView] in nsView?.release() }
+		}
 
 		guard let aspectRatio else { return }
 		// The window isn't attached during the first update, so defer to the next runloop. Re-run
