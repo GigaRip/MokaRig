@@ -31,6 +31,12 @@ struct VMMetadata: Codable, Equatable, Sendable {
 	/// which preserves a HiDPI scale set inside the guest that a resize would otherwise reset.
 	var dynamicResolution: Bool
 
+	/// Whether a macOS guest also gets a USB mouse alongside the always-present Mac trackpad. Off by
+	/// default — the trackpad handles everything and Apple's own sample attaches only a trackpad. Turn
+	/// it on to also get a plain mouse pointer (and a Mouse pane in the guest's settings). Ignored by
+	/// Linux guests, which always use their own USB pointing device.
+	var attachMouse: Bool
+
 	/// A lineage ID identifying VMs that are byte-for-byte copies of one another. Every VM gets a
 	/// unique one at creation; a copy — whether made through Duplicate or by copying the bundle in
 	/// Finder (which inherits this value) — shares it. VMs that share an ID also share a guest identity
@@ -79,6 +85,7 @@ struct VMMetadata: Codable, Equatable, Sendable {
 		needsInstall: true,
 		installerMediaPath: nil,
 		dynamicResolution: false,
+		attachMouse: false,
 		cloneGroup: UUID())
 
 	/// Sensible defaults for a new macOS guest.
@@ -92,5 +99,31 @@ struct VMMetadata: Codable, Equatable, Sendable {
 		needsInstall: true,
 		installerMediaPath: nil,
 		dynamicResolution: false,
+		attachMouse: false,
 		cloneGroup: UUID())
+}
+
+extension VMMetadata {
+	private enum CodingKeys: String, CodingKey {
+		case guestOS, cpuCount, memorySizeInBytes, displayWidthInPixels, displayHeightInPixels
+		case pixelsPerInch, needsInstall, installerMediaPath, dynamicResolution, attachMouse, cloneGroup
+	}
+
+	/// Custom decoding so a `Config.json` written before `attachMouse` existed still loads: the missing
+	/// key defaults to off rather than failing the whole decode (which would drop the VM from the
+	/// library). Unknown keys from earlier experiments are ignored.
+	init(from decoder: any Decoder) throws {
+		let container = try decoder.container(keyedBy: CodingKeys.self)
+		guestOS = try container.decode(GuestOS.self, forKey: .guestOS)
+		cpuCount = try container.decode(Int.self, forKey: .cpuCount)
+		memorySizeInBytes = try container.decode(UInt64.self, forKey: .memorySizeInBytes)
+		displayWidthInPixels = try container.decode(Int.self, forKey: .displayWidthInPixels)
+		displayHeightInPixels = try container.decode(Int.self, forKey: .displayHeightInPixels)
+		pixelsPerInch = try container.decode(Int.self, forKey: .pixelsPerInch)
+		needsInstall = try container.decode(Bool.self, forKey: .needsInstall)
+		installerMediaPath = try container.decodeIfPresent(String.self, forKey: .installerMediaPath)
+		dynamicResolution = try container.decode(Bool.self, forKey: .dynamicResolution)
+		attachMouse = try container.decodeIfPresent(Bool.self, forKey: .attachMouse) ?? false
+		cloneGroup = try container.decode(UUID.self, forKey: .cloneGroup)
+	}
 }

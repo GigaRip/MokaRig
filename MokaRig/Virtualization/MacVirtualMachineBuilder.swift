@@ -47,15 +47,15 @@ enum MacVirtualMachineBuilder {
 		// Globe/Fn key, media keys, and correct Apple key mapping. Requires a macOS 14+ host, which the
 		// deployment target guarantees.
 		configuration.keyboards = [VZMacKeyboardConfiguration()]
-		// Attach both a Mac trackpad and a USB pointing device. The trackpad delivers real gestures
-		// (two-finger secondary click, pinch); the USB device is the pointer for pre-driver contexts
-		// (Recovery, the installer, the login window). A virtualized macOS guest never surfaces a
-		// Trackpad pane in System Settings — a known Virtualization behavior (the host interprets the
-		// gestures and passes them in), so the gestures work regardless. Trackpad first per Apple's guidance.
-		configuration.pointingDevices = [
-			VZMacTrackpadConfiguration(),
-			VZUSBScreenCoordinatePointingDeviceConfiguration()
-		]
+		// Always attach a Mac trackpad — it delivers real gestures (two-finger secondary click, pinch)
+		// and is what Apple's own sample uses. A virtualized macOS guest never surfaces a Trackpad pane
+		// in System Settings (the host interprets the gestures and passes them in), but the gestures
+		// work regardless. A USB mouse is opt-in: it adds a plain pointer and a Mouse settings pane.
+		var pointingDevices: [VZPointingDeviceConfiguration] = [VZMacTrackpadConfiguration()]
+		if metadata.attachMouse {
+			pointingDevices.append(VZUSBScreenCoordinatePointingDeviceConfiguration())
+		}
+		configuration.pointingDevices = pointingDevices
 
 		let audio = VZVirtioSoundDeviceConfiguration()
 		let outputStream = VZVirtioSoundDeviceOutputStreamConfiguration()

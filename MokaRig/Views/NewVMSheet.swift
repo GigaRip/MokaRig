@@ -58,6 +58,7 @@ struct NewVMSheet: View {
 	@State private var resolution: DisplayResolution = .defaultPreset
 	@State private var dynamicResolution = false
 	@State private var retina = true
+	@State private var attachMouse = false
 	@State private var mediaURL: URL?
 	@State private var isImportingMedia = false
 
@@ -142,6 +143,15 @@ struct NewVMSheet: View {
 							VStack(alignment: .leading, spacing: 2) {
 								Label("Retina", systemImage: "sparkles")
 								Text("Renders the display at HiDPI for sharp text.")
+									.font(.caption)
+									.foregroundStyle(.secondary)
+							}
+						}
+						.disabled(isBusy)
+						Toggle(isOn: $attachMouse) {
+							VStack(alignment: .leading, spacing: 2) {
+								Label("Attach Mouse", systemImage: "computermouse")
+								Text("A trackpad is always attached; add a mouse for a plain pointer and a Mouse settings pane.")
 									.font(.caption)
 									.foregroundStyle(.secondary)
 							}
@@ -298,6 +308,7 @@ struct NewVMSheet: View {
 										displayHeight: resolution.heightInPixels,
 										displayPixelsPerInch: displayPixelsPerInch,
 										dynamicResolution: dynamicResolution,
+										attachMouse: attachMouse,
 										ipswURL: mediaURL, into: library)
 				switch installer.phase {
 				case .finished:

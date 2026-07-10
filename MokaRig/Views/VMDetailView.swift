@@ -53,6 +53,8 @@ struct VMDetailView: View {
 					detailRow("Retina",
 							  value: VMMetadata.isRetina(pixelsPerInch: metadata.pixelsPerInch) ? "On" : "Off",
 							  systemImage: "sparkles")
+					detailRow("Pointer", value: metadata.attachMouse ? "Trackpad & Mouse" : "Trackpad",
+							  systemImage: "cursorarrow")
 				}
 			}
 			Section("Status") {

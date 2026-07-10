@@ -24,6 +24,7 @@ struct EditVMSheet: View {
 	@State private var resolution: DisplayResolution
 	@State private var dynamicResolution: Bool
 	@State private var retina: Bool
+	@State private var attachMouse: Bool
 	@State private var errorMessage: String?
 
 	init(listing: VMListing, selection: Binding<VMBundle.ID?>) {
@@ -45,6 +46,7 @@ struct EditVMSheet: View {
 			label: "Custom"))
 		_dynamicResolution = State(initialValue: metadata.dynamicResolution)
 		_retina = State(initialValue: VMMetadata.isRetina(pixelsPerInch: metadata.pixelsPerInch))
+		_attachMouse = State(initialValue: metadata.attachMouse)
 	}
 
 	/// Processor counts offered, always including the VM's current value.
@@ -138,6 +140,14 @@ struct EditVMSheet: View {
 									.foregroundStyle(.secondary)
 							}
 						}
+						Toggle(isOn: $attachMouse) {
+							VStack(alignment: .leading, spacing: 2) {
+								Label("Attach Mouse", systemImage: "computermouse")
+								Text("A trackpad is always attached; add a mouse for a plain pointer and a Mouse settings pane.")
+									.font(.caption)
+									.foregroundStyle(.secondary)
+							}
+						}
 					}
 				}
 
@@ -211,6 +221,7 @@ struct EditVMSheet: View {
 		metadata.displayHeightInPixels = resolution.heightInPixels
 		metadata.pixelsPerInch = displayPixelsPerInch
 		metadata.dynamicResolution = dynamicResolution
+		metadata.attachMouse = attachMouse
 		do {
 			// Rename first: it's the only step that can fail on a name collision, and doing it before
 			// writing config leaves nothing to unwind if it throws. A no-op rename returns `listing`.
