@@ -1,0 +1,113 @@
+/* Styles the release notes shown inside Sparkle's update prompt (a WKWebView).
+   Scoped under .notes so nothing leaks to a bare document. MokaRig's look is
+   clean monochrome — no colored accent. The palette tracks the system
+   appearance: black-on-white in light mode, white-on-black in dark. */
+:root {
+	color-scheme: light dark;
+	--bg: #ffffff;
+	--fg: #111113;
+	--fg-muted: #6b6b70;
+	--rule: rgba(0, 0, 0, 0.10);
+	--chip-bg: rgba(0, 0, 0, 0.05);
+}
+
+@media (prefers-color-scheme: dark) {
+	:root {
+		--bg: #0b0b0c;
+		--fg: #f4f4f5;
+		--fg-muted: #8a8a90;
+		--rule: rgba(255, 255, 255, 0.12);
+		--chip-bg: rgba(255, 255, 255, 0.08);
+	}
+}
+
+html, body {
+	margin: 0;
+	background: var(--bg);
+}
+
+.notes {
+	font: 13px/1.5 -apple-system, BlinkMacSystemFont, "SF Pro Text", sans-serif;
+	color: var(--fg);
+	padding: 18px 22px 24px;
+	-webkit-font-smoothing: antialiased;
+}
+
+.notes > :first-child {
+	margin-top: 0;
+}
+
+/* An h1 is optional; Sparkle's own chrome already names the version. */
+.notes h1 {
+	font-size: 17px;
+	font-weight: 600;
+	margin: 0 0 4px;
+}
+
+/* Section labels ("New", "Improved", "Fixed") read as small muted chips. */
+.notes h2,
+.notes h3 {
+	font-size: 11px;
+	font-weight: 600;
+	text-transform: uppercase;
+	letter-spacing: 0.06em;
+	color: var(--fg-muted);
+	margin: 22px 0 8px;
+}
+
+.notes p {
+	color: var(--fg-muted);
+	margin: 8px 0;
+}
+
+.notes ul,
+.notes ol {
+	list-style: none;
+	margin: 8px 0;
+	padding: 0;
+}
+
+.notes li {
+	position: relative;
+	padding-left: 18px;
+	margin: 5px 0;
+}
+
+.notes li::before {
+	content: "";
+	position: absolute;
+	left: 3px;
+	top: 0.62em;
+	width: 5px;
+	height: 5px;
+	border-radius: 50%;
+	background: var(--fg-muted);
+}
+
+.notes strong {
+	font-weight: 600;
+	color: var(--fg);
+}
+
+.notes a {
+	color: var(--fg);
+	text-decoration: underline;
+	text-underline-offset: 2px;
+}
+
+.notes a:hover {
+	opacity: 0.7;
+}
+
+.notes code {
+	font: 0.9em ui-monospace, "SF Mono", Menlo, monospace;
+	background: var(--chip-bg);
+	padding: 1px 5px;
+	border-radius: 4px;
+}
+
+.notes hr {
+	border: 0;
+	border-top: 1px solid var(--rule);
+	margin: 18px 0;
+}

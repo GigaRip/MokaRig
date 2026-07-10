@@ -7,6 +7,7 @@
 #
 # One-time prerequisites (already done on your machine unless noted):
 #   brew install create-dmg
+#   brew install cmark                                # renders release notes
 #   xcrun notarytool store-credentials "mokarig-notary" \
 #       --apple-id <apple-id> --team-id G3RSHR4W5U --password <app-specific-pw>
 #   npm install -g wrangler && wrangler login        # for R2 upload
@@ -29,6 +30,12 @@ RELEASES_DIR="$HOME/MokaRigReleases"
 # 1.3.0 copies whatever single file it's given, so the Retina rep must be baked
 # into this one file rather than left as a sibling @2x.png.
 BG_IMAGE="packaging/dmg-background.tiff"
+# Per-version release notes. Each ReleaseNotes/<x.y.z>.md is the single source of
+# truth for that version's changes; cmark renders it into the stylesheet below and
+# generate_appcast embeds the result as the appcast item's <description>, which
+# Sparkle shows in the update prompt.
+RELEASE_NOTES_DIR="ReleaseNotes"
+RELEASE_NOTES_CSS="packaging/release-notes.css"
 # ---------------------------------------------------------------------------
 
 # --- Resolve the target version against R2 (the source of truth) -----------
@@ -81,6 +88,18 @@ else
 	IFS=. read -r _maj _min _pat <<< "$CURRENT_VERSION"
 	VERSION="$_maj.$_min.$((_pat + 1))"
 	echo "==> No version given; auto-incrementing $CURRENT_VERSION -> $VERSION"
+fi
+
+# --- Require release notes before the long build (fail fast) ----------------
+# Every update shows notes in Sparkle's prompt, so a release without them is a
+# mistake. Validate here, not after a 15-minute archive.
+NOTES_MD="$RELEASE_NOTES_DIR/$VERSION.md"
+command -v cmark >/dev/null || { echo "error: cmark not found — run 'brew install cmark'"; exit 1; }
+[ -f "$RELEASE_NOTES_CSS" ] || { echo "error: release-notes stylesheet '$RELEASE_NOTES_CSS' not found"; exit 1; }
+[ -f "$NOTES_MD" ] || { echo "error: release notes '$NOTES_MD' not found — write them before releasing $VERSION"; exit 1; }
+if grep -q 'RELEASE-NOTES-TODO' "$NOTES_MD"; then
+	echo "error: '$NOTES_MD' still has the RELEASE-NOTES-TODO placeholder — fill in the real notes."
+	exit 1
 fi
 
 WORK="$RELEASES_DIR/MokaRig-$VERSION"
@@ -191,6 +210,26 @@ if [ "$HAVE_APPCAST" -eq 1 ]; then
 else
 	echo "    no existing appcast in R2 (first release?) — continuing"
 fi
+
+# --- 8.5. Render release notes for every version present ----------------------
+# generate_appcast embeds a same-basename *.html sitting next to each DMG as that
+# item's <description>. It rewrites the whole feed each run, so render notes for
+# EVERY DMG in RELEASES_DIR that still has a markdown file in the repo — otherwise
+# regenerating on a fresh machine would drop older versions' notes from the feed.
+echo "==> Rendering release notes"
+for dmg in "$RELEASES_DIR"/MokaRig-*.dmg; do
+	[ -e "$dmg" ] || continue
+	base=$(basename "$dmg" .dmg)          # MokaRig-x.y.z
+	md="$RELEASE_NOTES_DIR/${base#MokaRig-}.md"
+	[ -f "$md" ] || continue              # releases predating notes: leave without
+	{
+		printf '<!doctype html>\n<html>\n<head>\n<meta charset="utf-8">\n<title>%s</title>\n<style>\n' "$base"
+		cat "$RELEASE_NOTES_CSS"
+		printf '</style>\n</head>\n<body>\n<article class="notes">\n'
+		cmark "$md"
+		printf '</article>\n</body>\n</html>\n'
+	} > "$RELEASES_DIR/$base.html"
+done
 
 # --- 9. Generate and publish the Sparkle appcast ------------------------------
 # generate_appcast (re)writes appcast.xml from the DMGs now in RELEASES_DIR (synced
