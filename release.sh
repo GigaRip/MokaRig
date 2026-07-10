@@ -241,12 +241,14 @@ else
 	echo "    no existing appcast in R2 (first release?) — continuing"
 fi
 
-# --- 8.5. Render release notes for every version present ----------------------
-# generate_appcast embeds a same-basename *.html sitting next to each DMG as that
-# item's <description>. It rewrites the whole feed each run, so render notes for
-# EVERY DMG in RELEASES_DIR that still has a markdown file in the repo — otherwise
-# regenerating on a fresh machine would drop older versions' notes from the feed.
-echo "==> Rendering release notes"
+# --- 8.5. Render and upload release notes for every version present -----------
+# generate_appcast writes a <sparkle:releaseNotesLink> pointing at a same-basename
+# *.html on the download host — it does NOT embed the notes inline — so each file
+# must be uploaded next to its DMG or Sparkle shows "An error occurred while
+# downloading the release notes". generate_appcast rewrites the whole feed every
+# run, so render and upload notes for EVERY DMG in RELEASES_DIR that still has a
+# markdown file in the repo; that also heals older versions missing from R2.
+echo "==> Rendering and uploading release notes"
 for dmg in "$RELEASES_DIR"/MokaRig-*.dmg; do
 	[ -e "$dmg" ] || continue
 	base=$(basename "$dmg" .dmg)          # MokaRig-x.y.z
@@ -259,6 +261,9 @@ for dmg in "$RELEASES_DIR"/MokaRig-*.dmg; do
 		cmark "$md"
 		printf '</article>\n</body>\n</html>\n'
 	} > "$RELEASES_DIR/$base.html"
+	# text/html (not the default octet-stream) so Sparkle's WKWebView renders it.
+	wrangler r2 object put "$BUCKET/$base.html" --file "$RELEASES_DIR/$base.html" \
+		--content-type "text/html;charset=utf-8" --remote
 done
 
 # --- 9. Generate and publish the Sparkle appcast ------------------------------
