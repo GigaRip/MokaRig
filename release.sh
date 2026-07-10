@@ -38,6 +38,36 @@ RELEASE_NOTES_DIR="ReleaseNotes"
 RELEASE_NOTES_CSS="packaging/release-notes.css"
 # ---------------------------------------------------------------------------
 
+# --- Require a clean, fully-pushed checkout ---------------------------------
+# The archive step builds the working directory and the tag written at the end
+# marks HEAD, so a release must come from a commit that is both the whole story
+# (nothing uncommitted) and already on the remote (nothing unpushed) — otherwise
+# the tag points at code no one else can fetch. Set ALLOW_DIRTY=1 to bypass all
+# three checks for a deliberate one-off.
+if [ "${ALLOW_DIRTY:-0}" != "1" ]; then
+	# (a) nothing unstaged, staged, or untracked.
+	if [ -n "$(git status --porcelain)" ]; then
+		echo "error: working tree is not clean — commit or stash first." >&2
+		echo "       Set ALLOW_DIRTY=1 to override. Changes below:" >&2
+		git status --short >&2
+		exit 1
+	fi
+	# (b) on a branch that tracks an upstream — otherwise 'pushed' is unverifiable.
+	upstream=$(git rev-parse --abbrev-ref --symbolic-full-name '@{upstream}' 2>/dev/null) || {
+		echo "error: HEAD has no upstream branch, so it can't be confirmed pushed." >&2
+		echo "       Push and set tracking (git push -u origin <branch>), or ALLOW_DIRTY=1." >&2
+		exit 1
+	}
+	# (c) no local commits ahead of the remote.
+	unpushed=$(git rev-list --count "$upstream"..HEAD)
+	if [ "$unpushed" -ne 0 ]; then
+		echo "error: $unpushed local commit(s) not pushed to $upstream — push first." >&2
+		echo "       Set ALLOW_DIRTY=1 to override. Unpushed commits below:" >&2
+		git log --oneline "$upstream"..HEAD >&2
+		exit 1
+	fi
+fi
+
 # --- Resolve the target version against R2 (the source of truth) -----------
 # The appcast in R2 lists every published DMG; the highest version there is the
 # current release. Fetch it before anything else — both auto-versioning and the
@@ -268,11 +298,24 @@ echo "==> Uploading appcast"
 # DMGs — keep its CDN cache TTL short so clients see new versions promptly.
 wrangler r2 object put "$BUCKET/appcast.xml" --file "$APPCAST" --remote
 
+# --- 11. Tag the released commit ----------------------------------------------
+# The tree was clean before the build (guard above), so HEAD is exactly what
+# shipped. Tag and push it now that the release is live. Best-effort: the release
+# is already published, so a tag or push hiccup warns instead of failing.
+echo "==> Tagging v$VERSION"
+if git rev-parse -q --verify "refs/tags/v$VERSION" >/dev/null; then
+	echo "    tag v$VERSION already exists — leaving it untouched"
+elif git tag "v$VERSION"; then
+	git push origin "v$VERSION" \
+		|| echo "    warning: tag created locally but push failed — run: git push origin v$VERSION"
+else
+	echo "    warning: could not create tag v$VERSION — tag manually: git tag v$VERSION && git push origin v$VERSION"
+fi
+
 echo ""
 echo "==> Done."
 echo "    $PUBLIC_BASE/MokaRig-$VERSION.dmg"
 echo "    $PUBLIC_BASE/MokaRig.dmg  (stable alias)"
 echo "    $PUBLIC_BASE/appcast.xml  (Sparkle feed)"
 echo ""
-echo "    Next: test the download in Safari on another Mac,"
-echo "    then tag the release:  git tag v$VERSION && git push --tags"
+echo "    Next: test the download in Safari on another Mac."
