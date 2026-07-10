@@ -43,8 +43,19 @@ enum MacVirtualMachineBuilder {
 		network.attachment = VZNATNetworkDeviceAttachment()
 		configuration.networkDevices = [network]
 
-		configuration.keyboards = [VZUSBKeyboardConfiguration()]
-		configuration.pointingDevices = [VZUSBScreenCoordinatePointingDeviceConfiguration()]
+		// A Mac keyboard (not a generic USB one) so the guest gets Mac-specific key events — the
+		// Globe/Fn key, media keys, and correct Apple key mapping. Requires a macOS 14+ host, which the
+		// deployment target guarantees.
+		configuration.keyboards = [VZMacKeyboardConfiguration()]
+		// Attach both a Mac trackpad and a USB pointing device. The trackpad delivers real gestures
+		// (two-finger secondary click, pinch); the USB device is the pointer for pre-driver contexts
+		// (Recovery, the installer, the login window). A virtualized macOS guest never surfaces a
+		// Trackpad pane in System Settings — a known Virtualization behavior (the host interprets the
+		// gestures and passes them in), so the gestures work regardless. Trackpad first per Apple's guidance.
+		configuration.pointingDevices = [
+			VZMacTrackpadConfiguration(),
+			VZUSBScreenCoordinatePointingDeviceConfiguration()
+		]
 
 		let audio = VZVirtioSoundDeviceConfiguration()
 		let outputStream = VZVirtioSoundDeviceOutputStreamConfiguration()
