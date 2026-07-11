@@ -4,7 +4,7 @@
 
 # MokaRig
 
-A macOS virtual machine manager built on Apple's Virtualization framework. It can
+A macOS simple virtual machine manager built on Apple's Virtualization framework. It can
 create and run Linux virtual machines — such as Ubuntu Desktop and Ubuntu
 Server — as well as macOS virtual machines.
 
