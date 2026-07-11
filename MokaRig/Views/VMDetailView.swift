@@ -34,7 +34,7 @@ struct VMDetailView: View {
 		Form {
 			Section {
 				detailRow("Name", value: listing.name, systemImage: "tag")
-				detailRow("Guest OS", value: metadata.guestOS.displayName, systemImage: "pc")
+				detailRow("Guest OS", value: metadata.guestOS.displayName, systemImage: metadata.guestOS.symbolName)
 			}
 			Section("Resources") {
 				detailRow("Compute", value: metadata.cpuCount == 1 ? "1 Core" : "\(metadata.cpuCount) Cores",

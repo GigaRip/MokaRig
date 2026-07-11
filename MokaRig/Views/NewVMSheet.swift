@@ -81,7 +81,7 @@ struct NewVMSheet: View {
 							Text(os.displayName).tag(os)
 						}
 					} label: {
-						Label("Guest OS", systemImage: "pc")
+						Label("Guest OS", systemImage: guestOS.symbolName)
 					}
 					.disabled(isBusy)
 

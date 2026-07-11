@@ -78,7 +78,7 @@ struct ConfigureVMSheet: View {
 						Text(listing.metadata.guestOS.displayName)
 							.foregroundStyle(.secondary)
 					} label: {
-						Label("Guest OS", systemImage: "pc")
+						Label("Guest OS", systemImage: listing.metadata.guestOS.symbolName)
 					}
 
 					LabeledContent {
