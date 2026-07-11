@@ -43,7 +43,7 @@ few deliberate principles:
 ## Screenshots
 
 <p align="center">
-  <img src="https://pictures.mokarig.com/screenshot-app.png" alt="MokaRig virtual machine library">
+  <img src="https://pictures.mokarig.com/screenshot-app.png?v=2" alt="MokaRig virtual machine library">
   <br>
   <em>Every virtual machine in one place — Linux and macOS side by side.</em>
 </p>
