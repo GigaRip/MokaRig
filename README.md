@@ -40,6 +40,20 @@ few deliberate principles:
 - Run each virtual machine in its own window.
 - Automatic updates via [Sparkle](https://sparkle-project.org).
 
+## Screenshots
+
+<p align="center">
+  <img src="https://pictures.mokarig.com/screenshot-app.png" alt="MokaRig virtual machine library">
+  <br>
+  <em>Every virtual machine in one place — Linux and macOS side by side.</em>
+</p>
+
+<p align="center">
+  <img src="https://pictures.mokarig.com/screenshot-vm.png" alt="MokaRig running a virtual machine">
+  <br>
+  <em>Run a full Linux desktop, right on your Mac.</em>
+</p>
+
 ## Requirements
 
 - A Mac with **Apple Silicon**.
