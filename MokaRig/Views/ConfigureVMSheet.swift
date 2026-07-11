@@ -9,8 +9,8 @@
 
 import SwiftUI
 
-/// A sheet for editing an existing virtual machine's configuration. Offered only while the VM is stopped.
-struct EditVMSheet: View {
+/// A sheet for configuring an existing virtual machine. Offered only while the VM is stopped.
+struct ConfigureVMSheet: View {
 	@Environment(VMLibrary.self) private var library
 	@Environment(VMRunner.self) private var runner
 	@Environment(\.dismiss) private var dismiss
@@ -54,9 +54,13 @@ struct EditVMSheet: View {
 		Array(Set(NewVMSheet.cpuOptions + [cpuCount])).sorted()
 	}
 
-	/// Memory sizes (GB) offered, always including the VM's current value.
+	/// Memory sizes (GB) offered, always including the VM's current value. macOS drops the tiny sizes
+	/// (1–4 GB), but the current value is always kept so an existing VM's setting stays selectable.
 	private var memoryOptions: [Int] {
-		Array(Set(NewVMSheet.memoryOptionsGB + [memoryGB])).sorted()
+		let base = listing.metadata.guestOS == .macOS
+			? NewVMSheet.memoryOptionsGB.filter { $0 >= NewVMSheet.minMacMemoryGB }
+			: NewVMSheet.memoryOptionsGB
+		return Array(Set(base + [memoryGB])).sorted()
 	}
 
 	/// Display presets offered, always including the VM's current resolution.
@@ -112,22 +116,42 @@ struct EditVMSheet: View {
 					} label: {
 						Label("Storage", systemImage: "internaldrive")
 					}
-					Picker(selection: $resolution) {
-						ForEach(resolutionOptions) { preset in
-							Text(preset.menuTitle).tag(preset)
-						}
-					} label: {
-						Label("Display", systemImage: "display")
-					}
-					// Dynamic resolution is driven by a Linux guest agent; macOS guests don't use it.
-					if listing.metadata.guestOS == .linux {
-						Toggle(isOn: $dynamicResolution) {
+					// The trackpad is always attached; the mouse is the opt-in pointer.
+					if listing.metadata.guestOS == .macOS {
+						Toggle(isOn: $attachMouse) {
 							VStack(alignment: .leading, spacing: 2) {
-								Label("Match Resolution to Window", systemImage: "arrow.up.left.and.arrow.down.right")
-								Text("Requires a guest agent in the VM (e.g. spice-vdagent).")
+								Label("Attach Mouse", systemImage: "computermouse")
+								Text("A trackpad is always attached; add a mouse for a plain pointer and a Mouse settings pane.")
 									.font(.caption)
 									.foregroundStyle(.secondary)
 							}
+						}
+					}
+				}
+
+				Section("Display") {
+					// One control instead of a resolution picker plus a toggle that silently overrides it:
+					// Fixed Size keeps the chosen resolution; Fit to Window lets the guest track the window.
+					Picker(selection: $dynamicResolution) {
+						Text("Fixed Size").tag(false)
+						Text("Fit to Window").tag(true)
+					} label: {
+						VStack(alignment: .leading, spacing: 2) {
+							Label("Mode", systemImage: "arrow.up.left.and.arrow.down.right")
+							if dynamicResolution {
+								Text(resolutionCaption)
+									.font(.caption)
+									.foregroundStyle(.secondary)
+							}
+						}
+					}
+					if !dynamicResolution {
+						Picker(selection: $resolution) {
+							ForEach(resolutionOptions) { preset in
+								Text(preset.menuTitle).tag(preset)
+							}
+						} label: {
+							Label("Screen Size", systemImage: "display")
 						}
 					}
 					// Pixel density (Retina vs standard) only affects macOS guests; Linux ignores it.
@@ -136,14 +160,6 @@ struct EditVMSheet: View {
 							VStack(alignment: .leading, spacing: 2) {
 								Label("Retina", systemImage: "sparkles")
 								Text("Renders the display at HiDPI for sharp text.")
-									.font(.caption)
-									.foregroundStyle(.secondary)
-							}
-						}
-						Toggle(isOn: $attachMouse) {
-							VStack(alignment: .leading, spacing: 2) {
-								Label("Attach Mouse", systemImage: "computermouse")
-								Text("A trackpad is always attached; add a mouse for a plain pointer and a Mouse settings pane.")
 									.font(.caption)
 									.foregroundStyle(.secondary)
 							}
@@ -162,10 +178,10 @@ struct EditVMSheet: View {
 			// A custom, leading-aligned header matching the New Virtual Machine sheet.
 			.safeAreaInset(edge: .top, spacing: 0) {
 				HStack(spacing: 10) {
-					Image(systemName: "square.and.pencil")
+					Image(systemName: "gearshape")
 						.font(.title2)
 						.foregroundStyle(.tint)
-					Text("Edit Virtual Machine")
+					Text("Configure Virtual Machine")
 						.font(.title3.weight(.semibold))
 					Spacer()
 				}
@@ -201,6 +217,13 @@ struct EditVMSheet: View {
 	private var resolvedName: String {
 		let trimmed = name.trimmingCharacters(in: .whitespacesAndNewlines)
 		return trimmed.isEmpty ? listing.name : trimmed
+	}
+
+	/// Caption shown when Fit to Window is selected: macOS resizes natively, Linux needs a guest agent.
+	private var resolutionCaption: String {
+		listing.metadata.guestOS == .linux
+			? "The guest display resizes to match the window. Requires a guest agent (e.g. spice-vdagent)."
+			: "The guest display resizes to match the window."
 	}
 
 	/// The display density to store: the Retina toggle drives it for macOS; Linux keeps the preset's

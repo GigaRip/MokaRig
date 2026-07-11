@@ -41,20 +41,23 @@ struct VMDetailView: View {
 						  systemImage: "cpu")
 				detailRow("Memory", value: memoryDescription(metadata.memorySizeInBytes), systemImage: "memorychip")
 				detailRow("Storage", value: storageDescription(listing.bundle), systemImage: "internaldrive")
-				detailRow("Display",
-						  value: "\(metadata.displayWidthInPixels) × \(metadata.displayHeightInPixels)",
-						  systemImage: "display")
-				if metadata.guestOS == .linux {
-					detailRow("Resolution",
-							  value: metadata.dynamicResolution ? "Matches window" : "Fixed",
-							  systemImage: "arrow.up.left.and.arrow.down.right")
+				if metadata.guestOS == .macOS {
+					detailRow("Pointer", value: metadata.attachMouse ? "Trackpad & Mouse" : "Trackpad",
+							  systemImage: "cursorarrow")
+				}
+			}
+			Section("Display") {
+				detailRow("Mode", value: metadata.dynamicResolution ? "Fit to Window" : "Fixed Size",
+						  systemImage: "arrow.up.left.and.arrow.down.right")
+				if !metadata.dynamicResolution {
+					detailRow("Screen Size",
+							  value: "\(metadata.displayWidthInPixels) × \(metadata.displayHeightInPixels)",
+							  systemImage: "display")
 				}
 				if metadata.guestOS == .macOS {
 					detailRow("Retina",
 							  value: VMMetadata.isRetina(pixelsPerInch: metadata.pixelsPerInch) ? "On" : "Off",
 							  systemImage: "sparkles")
-					detailRow("Pointer", value: metadata.attachMouse ? "Trackpad & Mouse" : "Trackpad",
-							  systemImage: "cursorarrow")
 				}
 			}
 			Section("Status") {
@@ -153,7 +156,7 @@ struct VMDetailView: View {
 				Button {
 					isPresentingEdit = true
 				} label: {
-					Label("Edit", systemImage: "square.and.pencil")
+					Label("Configure", systemImage: "gearshape")
 				}
 				.disabled(isActive)
 
@@ -173,7 +176,7 @@ struct VMDetailView: View {
 			}
 		}
 		.sheet(isPresented: $isPresentingEdit) {
-			EditVMSheet(listing: listing, selection: $selection)
+			ConfigureVMSheet(listing: listing, selection: $selection)
 		}
 		.confirmationDialog("Move “\(listing.name)” to the Trash?",
 							isPresented: $isConfirmingDelete, titleVisibility: .visible) {

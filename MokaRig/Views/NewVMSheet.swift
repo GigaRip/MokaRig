@@ -35,10 +35,14 @@ struct NewVMSheet: View {
 		return options
 	}()
 
-	/// Offered memory sizes (GB), capped at what the Virtualization framework allows on this host.
+	/// Offered memory sizes (GB). Capped by the Virtualization framework's ceiling and, more importantly,
+	/// at ~75% of physical RAM — handing a guest the host's full memory starves macOS and MokaRig and
+	/// invites heavy swapping, so always leave the host roughly a quarter.
 	static let memoryOptionsGB: [Int] = {
-		let maxBytes = VZVirtualMachineConfiguration.maximumAllowedMemorySize
-		return [1, 2, 4, 8, 16, 32, 64, 128].filter { UInt64($0) * 1_073_741_824 <= maxBytes }
+		let hostReserveCeiling = UInt64(Double(ProcessInfo.processInfo.physicalMemory) * 0.75)
+		let ceiling = min(VZVirtualMachineConfiguration.maximumAllowedMemorySize, hostReserveCeiling)
+		return [1, 2, 4, 8, 12, 16, 24, 32, 48, 64, 96, 128, 192, 256]
+			.filter { UInt64($0) * 1_073_741_824 <= ceiling }
 	}()
 
 	/// Offered storage sizes (GB). Disk images are sparse, so a large size doesn't consume space up front.
@@ -46,6 +50,9 @@ struct NewVMSheet: View {
 
 	/// The smallest disk offered for a macOS guest — the OS and its updates need more room than Linux.
 	static let minMacStorageGB = 128
+
+	/// The smallest memory offered for a macOS guest — 1–4 GB can't run a modern macOS sensibly.
+	static let minMacMemoryGB = 8
 
 	/// Default memory for a new VM: 16 GB (prudent for Ubuntu Desktop), clamped to what the host offers.
 	static let defaultMemoryGB = min(16, memoryOptionsGB.last ?? 16)
@@ -102,7 +109,7 @@ struct NewVMSheet: View {
 					}
 					.disabled(isBusy)
 					Picker(selection: $memoryGB) {
-						ForEach(Self.memoryOptionsGB, id: \.self) { gb in
+						ForEach(memoryOptions, id: \.self) { gb in
 							Text("\(gb) GB").tag(gb)
 						}
 					} label: {
@@ -117,23 +124,44 @@ struct NewVMSheet: View {
 						Label("Storage", systemImage: "internaldrive")
 					}
 					.disabled(isBusy)
-					Picker(selection: $resolution) {
-						ForEach(DisplayResolution.presets) { preset in
-							Text(preset.menuTitle).tag(preset)
-						}
-					} label: {
-						Label("Display", systemImage: "display")
-					}
-					.disabled(isBusy)
-					// Dynamic resolution is driven by a Linux guest agent; macOS guests don't use it.
-					if guestOS == .linux {
-						Toggle(isOn: $dynamicResolution) {
+					// The trackpad is always attached; the mouse is the opt-in pointer.
+					if guestOS == .macOS {
+						Toggle(isOn: $attachMouse) {
 							VStack(alignment: .leading, spacing: 2) {
-								Label("Match Resolution to Window", systemImage: "arrow.up.left.and.arrow.down.right")
-								Text("Requires a guest agent in the VM (e.g. spice-vdagent).")
+								Label("Attach Mouse", systemImage: "computermouse")
+								Text("A trackpad is always attached; add a mouse for a plain pointer and a Mouse settings pane.")
 									.font(.caption)
 									.foregroundStyle(.secondary)
 							}
+						}
+						.disabled(isBusy)
+					}
+				}
+
+				Section("Display") {
+					// One control instead of a resolution picker plus a toggle that silently overrides it:
+					// Fixed Size keeps the chosen resolution; Fit to Window lets the guest track the window.
+					Picker(selection: $dynamicResolution) {
+						Text("Fixed Size").tag(false)
+						Text("Fit to Window").tag(true)
+					} label: {
+						VStack(alignment: .leading, spacing: 2) {
+							Label("Mode", systemImage: "arrow.up.left.and.arrow.down.right")
+							if dynamicResolution {
+								Text(resolutionCaption)
+									.font(.caption)
+									.foregroundStyle(.secondary)
+							}
+						}
+					}
+					.disabled(isBusy)
+					if !dynamicResolution {
+						Picker(selection: $resolution) {
+							ForEach(DisplayResolution.presets) { preset in
+								Text(preset.menuTitle).tag(preset)
+							}
+						} label: {
+							Label("Screen Size", systemImage: "display")
 						}
 						.disabled(isBusy)
 					}
@@ -143,15 +171,6 @@ struct NewVMSheet: View {
 							VStack(alignment: .leading, spacing: 2) {
 								Label("Retina", systemImage: "sparkles")
 								Text("Renders the display at HiDPI for sharp text.")
-									.font(.caption)
-									.foregroundStyle(.secondary)
-							}
-						}
-						.disabled(isBusy)
-						Toggle(isOn: $attachMouse) {
-							VStack(alignment: .leading, spacing: 2) {
-								Label("Attach Mouse", systemImage: "computermouse")
-								Text("A trackpad is always attached; add a mouse for a plain pointer and a Mouse settings pane.")
 									.font(.caption)
 									.foregroundStyle(.secondary)
 							}
@@ -192,9 +211,12 @@ struct NewVMSheet: View {
 				}
 			}
 			.formStyle(.grouped)
-			// A macOS guest needs a larger disk than Linux, so raise the selection when switching.
+			// A macOS guest needs more disk and memory than Linux, so raise the selections when switching.
 			.onChange(of: guestOS) { _, newValue in
-				if newValue == .macOS { diskGB = max(diskGB, Self.minMacStorageGB) }
+				if newValue == .macOS {
+					diskGB = max(diskGB, Self.minMacStorageGB)
+					memoryGB = max(memoryGB, Self.minMacMemoryGB)
+				}
 			}
 			// A custom, leading-aligned header so the title lines up with the form content
 			// instead of using the more-indented default navigation title.
@@ -238,6 +260,18 @@ struct NewVMSheet: View {
 	/// Storage sizes offered for the selected guest — macOS starts at a higher floor than Linux.
 	private var storageOptions: [Int] {
 		guestOS == .macOS ? Self.storageOptionsGB.filter { $0 >= Self.minMacStorageGB } : Self.storageOptionsGB
+	}
+
+	/// Memory sizes offered for the selected guest — macOS starts at a higher floor than Linux.
+	private var memoryOptions: [Int] {
+		guestOS == .macOS ? Self.memoryOptionsGB.filter { $0 >= Self.minMacMemoryGB } : Self.memoryOptionsGB
+	}
+
+	/// Caption shown when Fit to Window is selected: macOS resizes natively, Linux needs a guest agent.
+	private var resolutionCaption: String {
+		guestOS == .linux
+			? "The guest display resizes to match the window. Requires a guest agent (e.g. spice-vdagent)."
+			: "The guest display resizes to match the window."
 	}
 
 	/// The display density to store: the Retina toggle drives it for macOS; Linux keeps the preset's

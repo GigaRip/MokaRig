@@ -53,6 +53,10 @@ private struct VMRunnerContent: View {
 	@State private var closeConfirmed = false
 	/// Whether the guest currently holds keyboard focus (clicked into) versus the host (title bar).
 	@State private var keyboardCaptured = false
+	/// The guest's live pixel resolution while in Fit to Window mode; `.zero` until first reported.
+	@State private var guestPixelSize: CGSize = .zero
+	/// Debounces writing the Fit-to-Window size back to the VM's config as the user drags to resize.
+	@State private var persistSizeTask: Task<Void, Never>?
 	private static let compactTitleWidth: CGFloat = 1000
 
 	/// True when the window is too narrow for the centered spec chips.
@@ -64,6 +68,15 @@ private struct VMRunnerContent: View {
 	/// window distinct from the others and from the main window.
 	private var windowTitle: String {
 		listing.name
+	}
+
+	/// The size chip: the guest's live resolution while Fit to Window tracks the window, otherwise the
+	/// fixed configured size.
+	private var sizeChipText: String {
+		if listing.metadata.dynamicResolution, guestPixelSize.width >= 1 {
+			return "\(Int(guestPixelSize.width)) × \(Int(guestPixelSize.height))"
+		}
+		return "\(listing.metadata.displayWidthInPixels) × \(listing.metadata.displayHeightInPixels)"
 	}
 
 	/// Tooltip for the keyboard-capture indicator, explaining which way input is currently routed.
@@ -89,7 +102,8 @@ private struct VMRunnerContent: View {
 				return false
 			},
 			keyboardCaptured: $keyboardCaptured,
-			guestIsRunning: state == .running)
+			guestIsRunning: state == .running,
+			onGuestPixelSizeChange: { guestPixelSize = $0 })
 			.background(.black)
 			.onGeometryChange(for: CGFloat.self) { $0.size.width } action: { contentWidth = $0 }
 			.navigationTitle(windowTitle)
@@ -107,11 +121,9 @@ private struct VMRunnerContent: View {
 									 systemImage: "cpu")
 							specChip(memoryDescription(listing.metadata.memorySizeInBytes), systemImage: "memorychip")
 							specChip(storageDescription(listing.bundle), systemImage: "internaldrive")
-							specChip("\(listing.metadata.displayWidthInPixels) × \(listing.metadata.displayHeightInPixels)",
-									 systemImage: "display")
-							if listing.metadata.guestOS == .linux {
-								specChip(listing.metadata.dynamicResolution ? "Matches window" : "Fixed",
-										 systemImage: "arrow.up.left.and.arrow.down.right")
+							specChip(sizeChipText, systemImage: "display")
+							if listing.metadata.dynamicResolution {
+								specChip("Fit to Window", systemImage: "arrow.up.left.and.arrow.down.right")
 							}
 							Image(systemName: keyboardCaptured ? "keyboard.fill" : "keyboard")
 								.foregroundStyle(keyboardCaptured ? AnyShapeStyle(.green) : AnyShapeStyle(.secondary))
@@ -161,6 +173,9 @@ private struct VMRunnerContent: View {
 					if closeConfirmed { dismiss() }
 				}
 			}
+			.onChange(of: guestPixelSize) { _, size in
+				rememberFitToWindowSize(size)
+			}
 			.confirmationDialog("Do you want to force “\(listing.name)” to power off?",
 								isPresented: $isConfirmingForceStop, titleVisibility: .visible) {
 				Button("Force Stop", role: .destructive) {
@@ -179,6 +194,29 @@ private struct VMRunnerContent: View {
 			} message: {
 				Text("Closing this window powers off the VM. Unsaved work in the guest may be lost.")
 			}
+	}
+
+	/// Writes the current Fit-to-Window size back to the VM's display dimensions so a restart reopens at
+	/// the last size. Debounced (a drag-resize fires continuously), and only while the guest is running
+	/// in Fit to Window mode. The window is aspect-locked to the guest ratio, so this keeps that ratio.
+	private func rememberFitToWindowSize(_ size: CGSize) {
+		guard listing.metadata.dynamicResolution,
+			  runner.liveInstance(for: listing.id)?.state == .running,
+			  size.width >= 1, size.height >= 1 else { return }
+		let width = Int(size.width.rounded())
+		let height = Int(size.height.rounded())
+		guard width != listing.metadata.displayWidthInPixels
+			|| height != listing.metadata.displayHeightInPixels else { return }
+		persistSizeTask?.cancel()
+		let target = listing
+		persistSizeTask = Task { @MainActor in
+			try? await Task.sleep(for: .milliseconds(600))
+			guard !Task.isCancelled else { return }
+			var metadata = target.metadata
+			metadata.displayWidthInPixels = width
+			metadata.displayHeightInPixels = height
+			_ = try? library.update(target, metadata: metadata)
+		}
 	}
 
 	/// A titlebar spec chip: an SF Symbol snug against its value.
