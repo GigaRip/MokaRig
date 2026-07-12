@@ -16,7 +16,7 @@ Because MokaRig is a focused tool, please open an issue to discuss any substanti
 
 A good bug report includes:
 
-- Your macOS version and Mac model (Apple Silicon is required).
+- Your macOS version and Mac model (Apple silicon is required).
 - The MokaRig version (see the About window).
 - Exact steps to reproduce, and what you expected instead.
 - Relevant console output or a crash log, if any.
@@ -25,7 +25,7 @@ A good bug report includes:
 
 Requirements:
 
-- A Mac with **Apple Silicon** (the app uses the Virtualization framework and ships arm64 only).
+- A Mac with **Apple silicon** (the app uses the Virtualization framework and ships ARM64 only).
 - **macOS 26.5.2 or later** (the current deployment target).
 - A matching version of **Xcode**.
 

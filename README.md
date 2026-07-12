@@ -33,8 +33,7 @@ few deliberate principles:
 
 - Create and run **Linux** virtual machines, such as Ubuntu Desktop and Ubuntu
   Server.
-- Create and run **macOS** virtual machines (see the note above regarding macOS
-  26.5.x hosts).
+- Create and run **macOS** virtual machines.
 - Manage a library of virtual machines, each with its own configuration
   (CPU, memory, and display resolution).
 - Run each virtual machine in its own window.
@@ -56,7 +55,7 @@ few deliberate principles:
 
 ## Requirements
 
-- A Mac with **Apple Silicon**.
+- A Mac with **Apple silicon**.
 - **macOS 26.5.2 or later**.
 
 ## Installation
@@ -70,7 +69,7 @@ To build from source instead, see [CONTRIBUTING.md](CONTRIBUTING.md).
 
 1. Launch MokaRig and choose to create a new virtual machine.
 2. Pick a guest type — Linux or macOS.
-3. For a Linux guest, provide an installer image. On Apple Silicon this **must**
+3. For a Linux guest, provide an installer image. On Apple silicon this **must**
    be an `arm64` image; `x86_64`/`amd64` images will not boot. For a graphical
    desktop, use a desktop image rather than a live-server image.
 4. Follow the guest's installer, then run the virtual machine from your library.
