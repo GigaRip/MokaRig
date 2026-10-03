@@ -6,7 +6,7 @@
 #   ./release.sh           auto-increment the patch of the current published release
 #
 # One-time prerequisites (already done on your machine unless noted):
-#   brew install create-dmg
+#   Terminal allowed to control Finder, which lays out the DMG window (macOS asks once)
 #   brew install cmark                                # renders release notes
 #   xcrun notarytool store-credentials "mokarig-notary" \
 #       --apple-id <apple-id> --team-id G3RSHR4W5U --password <app-specific-pw>
@@ -21,15 +21,21 @@ SCHEME="MokaRig"
 PROJECT="MokaRig.xcodeproj"          # switch to -workspace if you adopt one
 SIGN_ID="Developer ID Application: GigaRip LLC (G3RSHR4W5U)"
 NOTARY_PROFILE="mokarig-notary"
-BUCKET="mokarig-releases"
+BUCKET="mokarig-downloads"
 PUBLIC_BASE="https://downloads.mokarig.com"
 RELEASES_DIR="$HOME/MokaRigReleases"
 # HiDPI-aware background for the DMG window. A single .tiff carrying both the
 # 540x360 and 1080x720 reps (built with `tiffutil -cathidpicheck`); Finder picks
-# the rep matching the display, so Retina Macs get the sharp 2x image. create-dmg
-# 1.3.0 copies whatever single file it's given, so the Retina rep must be baked
-# into this one file rather than left as a sibling @2x.png.
+# the rep matching the display, so Retina Macs get the sharp 2x image. Finder is
+# given one file, so the Retina rep must be baked into this one file rather than
+# left as a sibling @2x.png. Everything but the grey
+# arrow is transparent, so Finder's own window background shows through and follows
+# light and dark mode. Finder draws item names black in light mode and white in
+# dark, so an opaque background of any one colour would hide them in one of the two.
 BG_IMAGE="packaging/dmg-background.tiff"
+# Renders the exported app's icon as macOS draws it, rounded and shaded, for the
+# mounted volume's icon and the DMG file's own icon.
+RENDER_APP_ICON="packaging/render-app-icon.swift"
 # Per-version release notes. Each ReleaseNotes/<x.y.z>.md is the single source of
 # truth for that version's changes; cmark renders it into the stylesheet below and
 # generate_appcast embeds the result as the appcast item's <description>, which
@@ -183,21 +189,154 @@ xcodebuild -exportArchive -archivePath "$ARCHIVE" \
 [ -d "$APP" ] || { echo "error: export did not produce $APP"; exit 1; }
 
 # --- 4. Build the DMG --------------------------------------------------------
+# Built with diskutil image, which replaces hdiutil's create, attach, resize, and
+# convert as of macOS 27: a blank read-write image is mounted out of Finder's
+# sight, filled, laid out by Finder, and converted to a compressed read-only
+# image. The image is APFS, which every Mac this app runs on reads.
 echo "==> Building DMG"
 # R2 is the source of truth for what's published, and the guard above already
 # rejected any already-released version, so a leftover local DMG from an aborted
-# run is safe to discard (create-dmg refuses to overwrite an existing file).
+# run is safe to discard.
 rm -f "$DMG"
-STAGING="$WORK/dmg-staging"
-mkdir -p "$STAGING"
-cp -R "$APP" "$STAGING/"
 [ -f "$BG_IMAGE" ] || { echo "error: DMG background '$BG_IMAGE' is missing"; exit 1; }
-create-dmg --volname "MokaRig" \
-	--background "$BG_IMAGE" \
-	--window-size 540 360 --icon-size 128 \
-	--icon "MokaRig.app" 130 160 \
-	--app-drop-link 400 160 \
-	"$DMG" "$STAGING/" >/dev/null
+[ -f "$RENDER_APP_ICON" ] || { echo "error: '$RENDER_APP_ICON' is missing"; exit 1; }
+
+VOLUME_NAME="MokaRig"
+APP_NAME="$(basename "$APP")"
+RW_DMG="$WORK/MokaRig-rw.dmg"
+rm -f "$RW_DMG"
+# Finder names a volume mounted outside /Volumes after its mount point, and the
+# layout script finds the volume by that name, so the name is made unique to keep
+# it from matching any other volume.
+MOUNT_DIR="$(mktemp -u "$WORK/MokaRig-dmg.XXXXXX")"
+DMG_DEVICE=""
+eject_dmg() {
+	if [ -n "$DMG_DEVICE" ]; then
+		diskutil eject "$DMG_DEVICE" >/dev/null || true
+		DMG_DEVICE=""
+	fi
+}
+# Replaces the trap set when the appcast was fetched, so it keeps that cleanup.
+trap 'eject_dmg; rm -f "$APPCAST_TMP" "$R2_ERR"' EXIT
+
+# diskutil reports progress as it goes, so its output is kept in a log and shown
+# only if it fails. The read-write image only has to hold the app with room to
+# spare; its free space compresses to almost nothing in the final image.
+DISKUTIL_LOG="$WORK/diskutil.log"
+APP_MEGABYTES=$(du -sm "$APP" | cut -f1)
+diskutil image create blank --fs APFS --size "$((APP_MEGABYTES * 2 + 64))m" \
+	--volumeName "$VOLUME_NAME" "$RW_DMG" >"$DISKUTIL_LOG" 2>&1 \
+	|| { cat "$DISKUTIL_LOG"; exit 1; }
+DMG_DEVICE=$(diskutil image attach --nobrowse --mountPoint "$MOUNT_DIR" "$RW_DMG" \
+	| awk '/^\/dev\//{ print $1; exit }')
+[ -n "$DMG_DEVICE" ] && [ -d "$MOUNT_DIR" ] || { echo "error: the read-write image did not mount"; exit 1; }
+
+ditto "$APP" "$MOUNT_DIR/$APP_NAME"
+ln -s /Applications "$MOUNT_DIR/Applications"
+mkdir "$MOUNT_DIR/.background"
+cp "$BG_IMAGE" "$MOUNT_DIR/.background/dmg-background.tiff"
+
+# The icon shows on the mounted volume (desktop, Finder sidebar, window title bar)
+# and, from step 6.5, on the DMG file itself. It is the app's icon as macOS draws
+# it, because a volume or file icon is shown exactly as given, without the rounding
+# and shading macOS applies when it shows the app.
+VOLUME_ICONSET="$WORK/VolumeIcon.iconset"
+VOLUME_ICON="$WORK/VolumeIcon.icns"
+rm -rf "$VOLUME_ICONSET"
+swift "$RENDER_APP_ICON" "$APP" "$VOLUME_ICONSET"
+iconutil -c icns -o "$VOLUME_ICON" "$VOLUME_ICONSET"
+cp "$VOLUME_ICON" "$MOUNT_DIR/.VolumeIcon.icns"
+# The volume shows its icon only with the custom icon flag set on its root. Finder
+# flags are bytes 8 and 9 of the 32-byte FinderInfo, and 0x0400 is the custom icon
+# flag. Writing it directly avoids SetFile, deprecated since Xcode 6.
+xattr -wx com.apple.FinderInfo 0000000000000000040000000000000000000000000000000000000000000000 "$MOUNT_DIR"
+
+# Finder takes a moment to notice a volume that was just mounted, and asking it
+# about the volume before then fails, so wait for it.
+DISK_NAME="$(basename "$MOUNT_DIR")"
+FINDER_SEES_DISK=0
+for _ in $(seq 1 30); do
+	if [ "$(osascript -e "tell application \"Finder\" to exists disk \"$DISK_NAME\"")" = "true" ]; then
+		FINDER_SEES_DISK=1
+		break
+	fi
+	sleep 1
+done
+[ "$FINDER_SEES_DISK" -eq 1 ] || { echo "error: Finder never saw the DMG volume $DISK_NAME, so it cannot lay out its window"; exit 1; }
+
+# The window is laid out the way create-dmg did it: icon view with no toolbar or
+# status bar, the background, every item moved out of sight before the two that
+# are shown are placed, so hidden files stay hidden even for someone who shows
+# them, and the window closed, reopened, and nudged so Finder takes its size as set
+# rather than as it first opened. Unlike create-dmg, the script ends by closing the
+# window: Finder writes a window's layout to .DS_Store when it closes, and only
+# sometimes before, so leaving it open made the wait for .DS_Store hit or miss.
+osascript - "$DISK_NAME" "$APP_NAME" >/dev/null <<'APPLESCRIPT'
+on run {diskName, appName}
+	tell application "Finder"
+		tell disk diskName
+			open
+			tell container window
+				set current view to icon view
+				set toolbar visible to false
+				set statusbar visible to false
+				set the bounds to {10, 60, 550, 420}
+				set position of every item to {640, 100}
+			end tell
+			set viewOptions to the icon view options of container window
+			tell viewOptions
+				set icon size to 128
+				set text size to 16
+				set arrangement to not arranged
+			end tell
+			set background picture of viewOptions to file ".background:dmg-background.tiff"
+			set position of item appName to {130, 160}
+			set position of item "Applications" to {400, 160}
+			close
+			open
+			delay 1
+			tell container window to set the bounds to {10, 60, 540, 410}
+			delay 1
+			tell container window to set the bounds to {10, 60, 550, 420}
+			delay 1
+			close
+		end tell
+	end tell
+end run
+APPLESCRIPT
+
+# Waits up to the given number of seconds for Finder to have written .DS_Store.
+wait_for_layout() {
+	for _ in $(seq 1 "$1"); do
+		[ -s "$MOUNT_DIR/.DS_Store" ] && return 0
+		sleep 1
+	done
+	return 1
+}
+if ! wait_for_layout 30; then
+	# Opening and closing the window again is another chance for Finder to write
+	# what it holds.
+	osascript - "$DISK_NAME" >/dev/null <<'APPLESCRIPT'
+on run {diskName}
+	tell application "Finder"
+		tell disk diskName
+			open
+			delay 1
+			close
+		end tell
+	end tell
+end run
+APPLESCRIPT
+	wait_for_layout 30 || { echo "error: Finder did not save the DMG window's layout"; exit 1; }
+fi
+
+chmod -Rf go-w "$MOUNT_DIR" || true
+rm -rf "$MOUNT_DIR/.fseventsd"
+eject_dmg
+
+diskutil image create from --format ULFO "$RW_DMG" "$DMG" >"$DISKUTIL_LOG" 2>&1 \
+	|| { cat "$DISKUTIL_LOG"; exit 1; }
+rm -f "$RW_DMG"
 
 # --- 5. Sign, notarize, staple the DMG ---------------------------------------
 # Notarizing the DMG scans and notarizes the nested app as well.
@@ -216,11 +355,36 @@ spctl -a -t open --context context:primary-signature -vv "$DMG" 2>&1 | grep -q "
 	|| { echo "error: Gatekeeper did not accept the DMG"; exit 1; }
 xcrun stapler validate "$DMG" >/dev/null
 
+# --- 6.5. Give the DMG file its icon -------------------------------------------
+# A file's custom icon lives in its extended attributes, outside the data the
+# signature and the stapled ticket cover, so it goes on after stapling and leaves
+# both intact. It shows wherever the file is copied Mac to Mac. R2 and every web
+# download carry only the data, so a downloaded DMG shows the generic disk image
+# icon, while the volume it mounts shows the app's.
+echo "==> Setting the DMG's icon"
+osascript -l JavaScript - "$VOLUME_ICON" "$DMG" <<'JXA'
+ObjC.import('AppKit');
+function run(argv) {
+	const image = $.NSImage.alloc.initWithContentsOfFile(argv[0]);
+	if (!image || image.isNil()) {
+		throw new Error('could not read ' + argv[0]);
+	}
+	if (!$.NSWorkspace.sharedWorkspace.setIconForFileOptions(image, argv[1], 0)) {
+		throw new Error('could not set the icon on ' + argv[1]);
+	}
+}
+JXA
+codesign --verify "$DMG" || { echo "error: setting the DMG's icon broke its signature"; exit 1; }
+xcrun stapler validate "$DMG" >/dev/null || { echo "error: setting the DMG's icon broke its stapled ticket"; exit 1; }
+
 # --- 7. Upload to R2 -----------------------------------------------------------
 echo "==> Uploading to R2"
-wrangler r2 object put "$BUCKET/MokaRig-$VERSION.dmg" --file "$DMG" --remote
+# Wrangler sends a Content-Type only when given one, so each upload names its type.
+wrangler r2 object put "$BUCKET/MokaRig-$VERSION.dmg" --file "$DMG" \
+	--content-type "application/x-apple-diskimage" --remote
 # Stable alias for the website download button:
-wrangler r2 object put "$BUCKET/MokaRig.dmg" --file "$DMG" --remote
+wrangler r2 object put "$BUCKET/MokaRig.dmg" --file "$DMG" \
+	--content-type "application/x-apple-diskimage" --remote
 
 # --- 8. Sync the published feed state from R2 ---------------------------------
 # generate_appcast rebuilds the feed from whatever DMGs are in RELEASES_DIR, so a
@@ -301,7 +465,8 @@ fi
 echo "==> Uploading appcast"
 # appcast.xml is mutable (rewritten each release), unlike the immutable versioned
 # DMGs — keep its CDN cache TTL short so clients see new versions promptly.
-wrangler r2 object put "$BUCKET/appcast.xml" --file "$APPCAST" --remote
+wrangler r2 object put "$BUCKET/appcast.xml" --file "$APPCAST" \
+	--content-type "application/xml" --remote
 
 # --- 11. Tag the released commit ----------------------------------------------
 # The tree was clean before the build (guard above), so HEAD is exactly what
