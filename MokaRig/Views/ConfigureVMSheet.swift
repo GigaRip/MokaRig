@@ -72,135 +72,141 @@ struct ConfigureVMSheet: View {
 
 	var body: some View {
 		NavigationStack {
-			Form {
-				Section {
-					LabeledContent {
-						Text(listing.metadata.guestOS.displayName)
-							.foregroundStyle(.secondary)
-					} label: {
-						Label("Guest OS", systemImage: listing.metadata.guestOS.symbolName)
-					}
+			// The header sits above the form instead of inset into it so scrolled rows never
+			// paint through the title.
+			VStack(spacing: 0) {
+				header
+				Form {
+					Section {
+						LabeledContent {
+							Text(listing.metadata.guestOS.displayName)
+								.foregroundStyle(.secondary)
+						} label: {
+							Label("Guest OS", systemImage: listing.metadata.guestOS.symbolName)
+						}
 
-					LabeledContent {
-						TextField(text: $name, prompt: Text(listing.name)) {
-							Text("Name")
-						}
-						.labelsHidden()
-						.onChange(of: name) { _, newValue in
-							let sanitized = VMMetadata.sanitizedInput(newValue)
-							if sanitized != newValue { name = sanitized }
-						}
-					} label: {
-						Label("Name", systemImage: "tag")
-					}
-				}
-
-				Section("Resources") {
-					Picker(selection: $cpuCount) {
-						ForEach(cpuOptions, id: \.self) { count in
-							Text(count == 1 ? "1 Core" : "\(count) Cores").tag(count)
-						}
-					} label: {
-						Label("Compute", systemImage: "cpu")
-					}
-					Picker(selection: $memoryGB) {
-						ForEach(memoryOptions, id: \.self) { gb in
-							Text("\(gb) GB").tag(gb)
-						}
-					} label: {
-						Label("Memory", systemImage: "memorychip")
-					}
-					LabeledContent {
-						Text(storageDescription)
-							.foregroundStyle(.secondary)
-					} label: {
-						Label("Storage", systemImage: "internaldrive")
-					}
-					// The trackpad is always attached; the mouse is the opt-in pointer.
-					if listing.metadata.guestOS == .macOS {
-						Toggle(isOn: $attachMouse) {
-							VStack(alignment: .leading, spacing: 2) {
-								Label("Attach Mouse", systemImage: "computermouse")
-								Text("A trackpad is always attached; add a mouse for a plain pointer and a Mouse settings pane.")
-									.font(.caption)
-									.foregroundStyle(.secondary)
+						LabeledContent {
+							TextField(text: $name, prompt: Text(listing.name)) {
+								Text("Name")
 							}
-						}
-					}
-				}
-
-				Section("Display") {
-					// One control instead of a resolution picker plus a toggle that silently overrides it:
-					// Fixed Size keeps the chosen resolution; Fit to Window lets the guest track the window.
-					Picker(selection: $dynamicResolution) {
-						Text("Fixed Size").tag(false)
-						Text("Fit to Window").tag(true)
-					} label: {
-						VStack(alignment: .leading, spacing: 2) {
-							Label("Mode", systemImage: "arrow.up.left.and.arrow.down.right")
-							if dynamicResolution {
-								Text(resolutionCaption)
-									.font(.caption)
-									.foregroundStyle(.secondary)
-							}
-						}
-					}
-					if !dynamicResolution {
-						Picker(selection: $resolution) {
-							ForEach(resolutionOptions) { preset in
-								Text(preset.menuTitle).tag(preset)
+							.labelsHidden()
+							.onChange(of: name) { _, newValue in
+								let sanitized = VMMetadata.sanitizedInput(newValue)
+								if sanitized != newValue { name = sanitized }
 							}
 						} label: {
-							Label("Screen Size", systemImage: "display")
+							Label("Name", systemImage: "tag")
 						}
 					}
-					// Pixel density (Retina vs standard) only affects macOS guests; Linux ignores it.
-					if listing.metadata.guestOS == .macOS {
-						Toggle(isOn: $retina) {
-							VStack(alignment: .leading, spacing: 2) {
-								Label("Retina", systemImage: "sparkles")
-								Text("Renders the display at HiDPI for sharp text.")
-									.font(.caption)
-									.foregroundStyle(.secondary)
+
+					Section("Resources") {
+						Picker(selection: $cpuCount) {
+							ForEach(cpuOptions, id: \.self) { count in
+								Text(count == 1 ? "1 Core" : "\(count) Cores").tag(count)
+							}
+						} label: {
+							Label("Compute", systemImage: "cpu")
+						}
+						Picker(selection: $memoryGB) {
+							ForEach(memoryOptions, id: \.self) { gb in
+								Text("\(gb) GB").tag(gb)
+							}
+						} label: {
+							Label("Memory", systemImage: "memorychip")
+						}
+						LabeledContent {
+							Text(storageDescription)
+								.foregroundStyle(.secondary)
+						} label: {
+							Label("Storage", systemImage: "internaldrive")
+						}
+						// The trackpad is always attached; the mouse is the opt-in pointer.
+						if listing.metadata.guestOS == .macOS {
+							Toggle(isOn: $attachMouse) {
+								VStack(alignment: .leading, spacing: 2) {
+									Label("Attach Mouse", systemImage: "computermouse")
+									Text("A trackpad is always attached; add a mouse for a plain pointer and a Mouse settings pane.")
+										.font(.caption)
+										.foregroundStyle(.secondary)
+								}
 							}
 						}
 					}
-				}
 
-				if let errorMessage {
-					Section {
-						Label(errorMessage, systemImage: "exclamationmark.triangle")
-							.foregroundStyle(.red)
+					Section("Display") {
+						// One control instead of a resolution picker plus a toggle that silently overrides it:
+						// Fixed Size keeps the chosen resolution; Fit to Window lets the guest track the window.
+						Picker(selection: $dynamicResolution) {
+							Text("Fixed Size").tag(false)
+							Text("Fit to Window").tag(true)
+						} label: {
+							VStack(alignment: .leading, spacing: 2) {
+								Label("Mode", systemImage: "arrow.up.left.and.arrow.down.right")
+								if dynamicResolution {
+									Text(resolutionCaption)
+										.font(.caption)
+										.foregroundStyle(.secondary)
+								}
+							}
+						}
+						if !dynamicResolution {
+							Picker(selection: $resolution) {
+								ForEach(resolutionOptions) { preset in
+									Text(preset.menuTitle).tag(preset)
+								}
+							} label: {
+								Label("Screen Size", systemImage: "display")
+							}
+						}
+						// Pixel density (Retina vs standard) only affects macOS guests; Linux ignores it.
+						if listing.metadata.guestOS == .macOS {
+							Toggle(isOn: $retina) {
+								VStack(alignment: .leading, spacing: 2) {
+									Label("Retina", systemImage: "sparkles")
+									Text("Renders the display at HiDPI for sharp text.")
+										.font(.caption)
+										.foregroundStyle(.secondary)
+								}
+							}
+						}
+					}
+
+					if let errorMessage {
+						Section {
+							Label(errorMessage, systemImage: "exclamationmark.triangle")
+								.foregroundStyle(.red)
+						}
 					}
 				}
-			}
-			.formStyle(.grouped)
-			// A custom, leading-aligned header matching the New Virtual Machine sheet.
-			.safeAreaInset(edge: .top, spacing: 0) {
-				HStack(spacing: 10) {
-					Image(systemName: "gearshape")
-						.font(.title2)
-						.foregroundStyle(.tint)
-					Text("Configure Virtual Machine")
-						.font(.title3.weight(.semibold))
-					Spacer()
-				}
-				.padding(.leading, 18)
-				.padding(.trailing, 20)
-				.padding(.top, 20)
-				.padding(.bottom, 12)
-			}
-			.toolbar {
-				ToolbarItem(placement: .cancellationAction) {
-					Button("Cancel") { dismiss() }
-				}
-				ToolbarItem(placement: .confirmationAction) {
-					Button("Save") { save() }
+				.formStyle(.grouped)
+				.toolbar {
+					ToolbarItem(placement: .cancellationAction) {
+						Button("Cancel") { dismiss() }
+					}
+					ToolbarItem(placement: .confirmationAction) {
+						Button("Save") { save() }
+					}
 				}
 			}
 		}
 		.frame(minWidth: 460)
 		.presentationSizing(.fitted)
+	}
+
+	/// A leading-aligned title matching the New Virtual Machine sheet.
+	private var header: some View {
+		HStack(spacing: 10) {
+			Image(systemName: "gearshape")
+				.font(.title2)
+				.foregroundStyle(.tint)
+			Text("Configure Virtual Machine")
+				.font(.title3.weight(.semibold))
+			Spacer()
+		}
+		.padding(.leading, 18)
+		.padding(.trailing, 20)
+		.padding(.top, 20)
+		.padding(.bottom, 12)
 	}
 
 	// MARK: - Derived state
