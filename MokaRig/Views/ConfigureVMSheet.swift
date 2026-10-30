@@ -26,6 +26,7 @@ struct ConfigureVMSheet: View {
 	@State private var retina: Bool
 	@State private var attachMouse: Bool
 	@State private var shareClipboard: Bool
+	@State private var attachGuestTools: Bool
 	@State private var errorMessage: String?
 
 	init(listing: VMListing, selection: Binding<VMBundle.ID?>) {
@@ -49,6 +50,7 @@ struct ConfigureVMSheet: View {
 		_retina = State(initialValue: VMMetadata.isRetina(pixelsPerInch: metadata.pixelsPerInch))
 		_attachMouse = State(initialValue: metadata.attachMouse)
 		_shareClipboard = State(initialValue: metadata.shareClipboard)
+		_attachGuestTools = State(initialValue: metadata.attachGuestTools)
 	}
 
 	/// Processor counts offered, always including the VM's current value.
@@ -135,9 +137,19 @@ struct ConfigureVMSheet: View {
 							Toggle(isOn: $shareClipboard) {
 								VStack(alignment: .leading, spacing: 2) {
 									Label("Share Clipboard", systemImage: "clipboard")
-									Text("Requires macOS 15 or later in the guest and a SPICE guest agent installed there.")
+									Text("Requires macOS 15 or later in the guest and the MokaRig Guest Agent, which installs from the Guest Tools disk.")
 										.font(.caption)
 										.foregroundStyle(.secondary)
+								}
+							}
+							if shareClipboard {
+								Toggle(isOn: $attachGuestTools) {
+									VStack(alignment: .leading, spacing: 2) {
+										Label("Attach Guest Tools", systemImage: "externaldrive")
+										Text("Adds a disk to the guest with the agent installer. Turn this off once the agent is installed.")
+											.font(.caption)
+											.foregroundStyle(.secondary)
+									}
 								}
 							}
 						}
@@ -262,6 +274,7 @@ struct ConfigureVMSheet: View {
 		metadata.dynamicResolution = dynamicResolution
 		metadata.attachMouse = attachMouse
 		metadata.shareClipboard = shareClipboard
+		metadata.attachGuestTools = attachGuestTools
 		do {
 			// Rename first: it's the only step that can fail on a name collision, and doing it before
 			// writing config leaves nothing to unwind if it throws. A no-op rename returns `listing`.

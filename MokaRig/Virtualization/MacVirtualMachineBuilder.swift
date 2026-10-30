@@ -68,6 +68,9 @@ enum MacVirtualMachineBuilder {
 		// installation, when no agent can be running yet.
 		if metadata.shareClipboard && !metadata.needsInstall {
 			configuration.consoleDevices = [VZVirtioConsoleDeviceConfiguration.spiceAgent()]
+			if metadata.attachGuestTools, let guestTools = makeGuestToolsDisk() {
+				configuration.storageDevices.append(guestTools)
+			}
 		}
 
 		do {
@@ -76,6 +79,16 @@ enum MacVirtualMachineBuilder {
 			throw VMError.configurationInvalid(error.localizedDescription)
 		}
 		return configuration
+	}
+
+	/// The disk holding the guest agent installer, or nil if it can't be attached, which shouldn't stop
+	/// the VM from booting. Every VM shares this one file, which Virtualization allows when read-only.
+	private static func makeGuestToolsDisk() -> VZVirtioBlockDeviceConfiguration? {
+		guard let url = Bundle.main.url(forResource: "GuestTools", withExtension: "img"),
+			  let attachment = try? VZDiskImageStorageDeviceAttachment(url: url, readOnly: true) else {
+			return nil
+		}
+		return VZVirtioBlockDeviceConfiguration(attachment: attachment)
 	}
 
 	/// Reconstructs the Mac platform configuration from the data saved in the bundle.

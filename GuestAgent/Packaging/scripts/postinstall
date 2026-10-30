@@ -1,0 +1,11 @@
+#!/bin/sh
+# Starts the agent for the logged-in user, so clipboard sharing works without logging out. At the
+# login window the console belongs to root, and launchd loads the agent at the next login instead.
+
+[ "$3" = "/" ] || exit 0
+
+console_uid=$(stat -f %u /dev/console)
+if [ "$console_uid" != "0" ]; then
+	launchctl bootstrap "gui/$console_uid" "/Library/LaunchAgents/com.gigarip.mokarig.guest-agent.plist"
+fi
+exit 0

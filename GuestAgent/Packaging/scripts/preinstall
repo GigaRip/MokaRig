@@ -1,0 +1,10 @@
+#!/bin/sh
+# Stops a running copy so an upgrade doesn't leave the old binary loaded.
+
+[ "$3" = "/" ] || exit 0
+
+console_uid=$(stat -f %u /dev/console)
+if [ "$console_uid" != "0" ]; then
+	launchctl bootout "gui/$console_uid/com.gigarip.mokarig.guest-agent" 2>/dev/null
+fi
+exit 0

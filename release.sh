@@ -11,6 +11,9 @@
 #   xcrun notarytool store-credentials "mokarig-notary" \
 #       --apple-id <apple-id> --team-id G3RSHR4W5U --password <app-specific-pw>
 #   npm install -g wrangler && wrangler login        # for R2 upload
+#   A "Developer ID Installer" certificate, then set INSTALLER_SIGN_ID below, to sign the
+#   guest agent installer. Without it the installer ships unsigned, and the agent inside
+#   it is still signed with SIGN_ID.
 #
 # The script expects to be run from the repo root (where MokaRig.xcodeproj lives).
 
@@ -20,6 +23,7 @@ set -euo pipefail
 SCHEME="MokaRig"
 PROJECT="MokaRig.xcodeproj"          # switch to -workspace if you adopt one
 SIGN_ID="Developer ID Application: GigaRip LLC (G3RSHR4W5U)"
+INSTALLER_SIGN_ID=""
 NOTARY_PROFILE="mokarig-notary"
 BUCKET="mokarig-downloads"
 PUBLIC_BASE="https://downloads.mokarig.com"
@@ -166,6 +170,8 @@ xcodebuild -project "$PROJECT" -scheme "$SCHEME" -configuration Release \
 	-destination 'generic/platform=macOS' \
 	MARKETING_VERSION="$VERSION" \
 	CURRENT_PROJECT_VERSION="$BUILD_NUMBER" \
+	AGENT_SIGN_ID="$SIGN_ID" \
+	INSTALLER_SIGN_ID="$INSTALLER_SIGN_ID" \
 	archive -archivePath "$ARCHIVE" -quiet
 
 # --- 3. Export with Developer ID signing ------------------------------------

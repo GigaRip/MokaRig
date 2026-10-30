@@ -46,6 +46,10 @@ struct VMDetailView: View {
 							  systemImage: "cursorarrow")
 					detailRow("Clipboard", value: metadata.shareClipboard ? "Shared" : "Off",
 							  systemImage: "clipboard")
+					if metadata.shareClipboard {
+						detailRow("Guest Tools", value: metadata.attachGuestTools ? "Attached" : "Off",
+								  systemImage: "externaldrive")
+					}
 				}
 			}
 			Section("Display") {

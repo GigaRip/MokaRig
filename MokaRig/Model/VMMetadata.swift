@@ -42,6 +42,10 @@ struct VMMetadata: Codable, Equatable, Sendable {
 	/// this setting stay off. Ignored by Linux guests, which always get the port.
 	var shareClipboard: Bool
 
+	/// Whether a macOS guest with clipboard sharing also gets the Guest Tools disk, which holds the
+	/// guest agent installer. Ignored without `shareClipboard`, and by Linux guests.
+	var attachGuestTools: Bool
+
 	/// A lineage ID identifying VMs that are byte-for-byte copies of one another. Every VM gets a
 	/// unique one at creation; a copy — whether made through Duplicate or by copying the bundle in
 	/// Finder (which inherits this value) — shares it. VMs that share an ID also share a guest identity
@@ -92,6 +96,7 @@ struct VMMetadata: Codable, Equatable, Sendable {
 		dynamicResolution: false,
 		attachMouse: false,
 		shareClipboard: true,
+		attachGuestTools: true,
 		cloneGroup: UUID())
 
 	/// Sensible defaults for a new macOS guest.
@@ -107,6 +112,7 @@ struct VMMetadata: Codable, Equatable, Sendable {
 		dynamicResolution: false,
 		attachMouse: false,
 		shareClipboard: true,
+		attachGuestTools: true,
 		cloneGroup: UUID())
 }
 
@@ -114,7 +120,7 @@ extension VMMetadata {
 	private enum CodingKeys: String, CodingKey {
 		case guestOS, cpuCount, memorySizeInBytes, displayWidthInPixels, displayHeightInPixels
 		case pixelsPerInch, needsInstall, installerMediaPath, dynamicResolution, attachMouse
-		case shareClipboard, cloneGroup
+		case shareClipboard, attachGuestTools, cloneGroup
 	}
 
 	/// Custom decoding so a `Config.json` written before `attachMouse` or `shareClipboard` existed still
@@ -133,6 +139,9 @@ extension VMMetadata {
 		dynamicResolution = try container.decode(Bool.self, forKey: .dynamicResolution)
 		attachMouse = try container.decodeIfPresent(Bool.self, forKey: .attachMouse) ?? false
 		shareClipboard = try container.decodeIfPresent(Bool.self, forKey: .shareClipboard) ?? false
+		// Defaults to on, unlike the settings above: a VM already sharing its clipboard needs the disk
+		// to get the agent, and the disk has no effect on a VM that isn't.
+		attachGuestTools = try container.decodeIfPresent(Bool.self, forKey: .attachGuestTools) ?? true
 		cloneGroup = try container.decode(UUID.self, forKey: .cloneGroup)
 	}
 }
