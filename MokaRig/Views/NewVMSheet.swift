@@ -66,6 +66,7 @@ struct NewVMSheet: View {
 	@State private var dynamicResolution = false
 	@State private var retina = true
 	@State private var attachMouse = false
+	@State private var shareClipboard = false
 	@State private var mediaURL: URL?
 	@State private var isImportingMedia = false
 
@@ -134,6 +135,15 @@ struct NewVMSheet: View {
 								VStack(alignment: .leading, spacing: 2) {
 									Label("Attach Mouse", systemImage: "computermouse")
 									Text("A trackpad is always attached; add a mouse for a plain pointer and a Mouse settings pane.")
+										.font(.caption)
+										.foregroundStyle(.secondary)
+								}
+							}
+							.disabled(isBusy)
+							Toggle(isOn: $shareClipboard) {
+								VStack(alignment: .leading, spacing: 2) {
+									Label("Share Clipboard", systemImage: "doc.on.clipboard")
+									Text("Requires macOS 15 or later in the guest and a SPICE guest agent installed there.")
 										.font(.caption)
 										.foregroundStyle(.secondary)
 								}
@@ -348,6 +358,7 @@ struct NewVMSheet: View {
 										displayPixelsPerInch: displayPixelsPerInch,
 										dynamicResolution: dynamicResolution,
 										attachMouse: attachMouse,
+										shareClipboard: shareClipboard,
 										ipswURL: mediaURL, into: library)
 				switch installer.phase {
 				case .finished:

@@ -32,7 +32,7 @@ final class MacInstaller {
 	@discardableResult
 	func install(name: String, cpuCount: Int, memoryBytes: UInt64, diskBytes: UInt64,
 				 displayWidth: Int, displayHeight: Int, displayPixelsPerInch: Int,
-				 dynamicResolution: Bool, attachMouse: Bool,
+				 dynamicResolution: Bool, attachMouse: Bool, shareClipboard: Bool,
 				 ipswURL: URL, into library: VMLibrary) async -> VMBundle.ID? {
 		phase = .preparing
 		do {
@@ -61,6 +61,7 @@ final class MacInstaller {
 			metadata.pixelsPerInch = displayPixelsPerInch
 			metadata.dynamicResolution = dynamicResolution
 			metadata.attachMouse = attachMouse
+			metadata.shareClipboard = shareClipboard
 			metadata.needsInstall = true
 			metadata.cloneGroup = UUID()
 			try bundle.save(metadata)

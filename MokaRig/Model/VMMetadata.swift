@@ -37,6 +37,11 @@ struct VMMetadata: Codable, Equatable, Sendable {
 	/// Linux guests, which always use their own USB pointing device.
 	var attachMouse: Bool
 
+	/// Whether a macOS guest gets the SPICE console port used for clipboard sharing. Off by default:
+	/// it needs a macOS 15+ guest with a SPICE agent installed. Ignored by Linux guests, which always
+	/// get the port.
+	var shareClipboard: Bool
+
 	/// A lineage ID identifying VMs that are byte-for-byte copies of one another. Every VM gets a
 	/// unique one at creation; a copy — whether made through Duplicate or by copying the bundle in
 	/// Finder (which inherits this value) — shares it. VMs that share an ID also share a guest identity
@@ -86,6 +91,7 @@ struct VMMetadata: Codable, Equatable, Sendable {
 		installerMediaPath: nil,
 		dynamicResolution: false,
 		attachMouse: false,
+		shareClipboard: false,
 		cloneGroup: UUID())
 
 	/// Sensible defaults for a new macOS guest.
@@ -100,18 +106,20 @@ struct VMMetadata: Codable, Equatable, Sendable {
 		installerMediaPath: nil,
 		dynamicResolution: false,
 		attachMouse: false,
+		shareClipboard: false,
 		cloneGroup: UUID())
 }
 
 extension VMMetadata {
 	private enum CodingKeys: String, CodingKey {
 		case guestOS, cpuCount, memorySizeInBytes, displayWidthInPixels, displayHeightInPixels
-		case pixelsPerInch, needsInstall, installerMediaPath, dynamicResolution, attachMouse, cloneGroup
+		case pixelsPerInch, needsInstall, installerMediaPath, dynamicResolution, attachMouse
+		case shareClipboard, cloneGroup
 	}
 
-	/// Custom decoding so a `Config.json` written before `attachMouse` existed still loads: the missing
-	/// key defaults to off rather than failing the whole decode (which would drop the VM from the
-	/// library). Unknown keys from earlier experiments are ignored.
+	/// Custom decoding so a `Config.json` written before `attachMouse` or `shareClipboard` existed still
+	/// loads: a missing key defaults to off rather than failing the whole decode (which would drop the
+	/// VM from the library). Unknown keys from earlier experiments are ignored.
 	init(from decoder: any Decoder) throws {
 		let container = try decoder.container(keyedBy: CodingKeys.self)
 		guestOS = try container.decode(GuestOS.self, forKey: .guestOS)
@@ -124,6 +132,7 @@ extension VMMetadata {
 		installerMediaPath = try container.decodeIfPresent(String.self, forKey: .installerMediaPath)
 		dynamicResolution = try container.decode(Bool.self, forKey: .dynamicResolution)
 		attachMouse = try container.decodeIfPresent(Bool.self, forKey: .attachMouse) ?? false
+		shareClipboard = try container.decodeIfPresent(Bool.self, forKey: .shareClipboard) ?? false
 		cloneGroup = try container.decode(UUID.self, forKey: .cloneGroup)
 	}
 }

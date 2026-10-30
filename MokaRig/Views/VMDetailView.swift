@@ -44,6 +44,8 @@ struct VMDetailView: View {
 				if metadata.guestOS == .macOS {
 					detailRow("Pointer", value: metadata.attachMouse ? "Trackpad & Mouse" : "Trackpad",
 							  systemImage: "cursorarrow")
+					detailRow("Clipboard", value: metadata.shareClipboard ? "Shared" : "Off",
+							  systemImage: "doc.on.clipboard")
 				}
 			}
 			Section("Display") {

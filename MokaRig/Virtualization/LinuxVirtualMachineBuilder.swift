@@ -44,7 +44,7 @@ enum LinuxVirtualMachineBuilder {
 		configuration.audioDevices = [makeOutputAudioDevice()]
 		configuration.keyboards = [VZUSBKeyboardConfiguration()]
 		configuration.pointingDevices = [VZUSBScreenCoordinatePointingDeviceConfiguration()]
-		configuration.consoleDevices = [makeSpiceAgentConsole()]
+		configuration.consoleDevices = [VZVirtioConsoleDeviceConfiguration.spiceAgent()]
 
 		do {
 			try configuration.validate()
@@ -100,19 +100,6 @@ enum LinuxVirtualMachineBuilder {
 		outputStream.sink = VZHostAudioOutputStreamSink()
 		device.streams = [outputStream]
 		return device
-	}
-
-	/// A console device carrying the SPICE agent, which enables copy/paste and dynamic resolution
-	/// in the guest. Both require a SPICE guest agent (e.g. spice-vdagent) running in the guest.
-	private static func makeSpiceAgentConsole() -> VZVirtioConsoleDeviceConfiguration {
-		let console = VZVirtioConsoleDeviceConfiguration()
-		let port = VZVirtioConsolePortConfiguration()
-		port.name = VZSpiceAgentPortAttachment.spiceAgentPortName
-		let attachment = VZSpiceAgentPortAttachment()
-		attachment.sharesClipboard = true
-		port.attachment = attachment
-		console.ports[0] = port
-		return console
 	}
 
 	private static func clampedCPUCount(_ requested: Int) -> Int {

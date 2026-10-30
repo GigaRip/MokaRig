@@ -25,6 +25,7 @@ struct ConfigureVMSheet: View {
 	@State private var dynamicResolution: Bool
 	@State private var retina: Bool
 	@State private var attachMouse: Bool
+	@State private var shareClipboard: Bool
 	@State private var errorMessage: String?
 
 	init(listing: VMListing, selection: Binding<VMBundle.ID?>) {
@@ -47,6 +48,7 @@ struct ConfigureVMSheet: View {
 		_dynamicResolution = State(initialValue: metadata.dynamicResolution)
 		_retina = State(initialValue: VMMetadata.isRetina(pixelsPerInch: metadata.pixelsPerInch))
 		_attachMouse = State(initialValue: metadata.attachMouse)
+		_shareClipboard = State(initialValue: metadata.shareClipboard)
 	}
 
 	/// Processor counts offered, always including the VM's current value.
@@ -126,6 +128,14 @@ struct ConfigureVMSheet: View {
 								VStack(alignment: .leading, spacing: 2) {
 									Label("Attach Mouse", systemImage: "computermouse")
 									Text("A trackpad is always attached; add a mouse for a plain pointer and a Mouse settings pane.")
+										.font(.caption)
+										.foregroundStyle(.secondary)
+								}
+							}
+							Toggle(isOn: $shareClipboard) {
+								VStack(alignment: .leading, spacing: 2) {
+									Label("Share Clipboard", systemImage: "doc.on.clipboard")
+									Text("Requires macOS 15 or later in the guest and a SPICE guest agent installed there.")
 										.font(.caption)
 										.foregroundStyle(.secondary)
 								}
@@ -251,6 +261,7 @@ struct ConfigureVMSheet: View {
 		metadata.pixelsPerInch = displayPixelsPerInch
 		metadata.dynamicResolution = dynamicResolution
 		metadata.attachMouse = attachMouse
+		metadata.shareClipboard = shareClipboard
 		do {
 			// Rename first: it's the only step that can fail on a name collision, and doing it before
 			// writing config leaves nothing to unwind if it throws. A no-op rename returns `listing`.
