@@ -64,8 +64,8 @@ enum MacVirtualMachineBuilder {
 		configuration.audioDevices = [audio]
 
 		// Apple documents this port for Linux guests only. It works on macOS 15+ guests running a
-		// third-party SPICE agent, and earlier guests fail on a VirtIO driver bug, hence the opt-in.
-		// Left off during installation, when no agent can be running yet.
+		// third-party SPICE agent, and earlier guests fail on a VirtIO driver bug. Left off during
+		// installation, when no agent can be running yet.
 		if metadata.shareClipboard && !metadata.needsInstall {
 			configuration.consoleDevices = [VZVirtioConsoleDeviceConfiguration.spiceAgent()]
 		}

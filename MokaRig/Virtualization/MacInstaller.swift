@@ -61,7 +61,8 @@ final class MacInstaller {
 			metadata.pixelsPerInch = displayPixelsPerInch
 			metadata.dynamicResolution = dynamicResolution
 			metadata.attachMouse = attachMouse
-			metadata.shareClipboard = shareClipboard
+			// Guests before macOS 15 fail on a VirtIO driver bug, so they never get the SPICE port.
+			metadata.shareClipboard = shareClipboard && restoreImage.operatingSystemVersion.majorVersion >= 15
 			metadata.needsInstall = true
 			metadata.cloneGroup = UUID()
 			try bundle.save(metadata)

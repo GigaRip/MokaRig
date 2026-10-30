@@ -66,7 +66,7 @@ struct NewVMSheet: View {
 	@State private var dynamicResolution = false
 	@State private var retina = true
 	@State private var attachMouse = false
-	@State private var shareClipboard = false
+	@State private var shareClipboard = true
 	@State private var mediaURL: URL?
 	@State private var isImportingMedia = false
 
@@ -142,7 +142,7 @@ struct NewVMSheet: View {
 							.disabled(isBusy)
 							Toggle(isOn: $shareClipboard) {
 								VStack(alignment: .leading, spacing: 2) {
-									Label("Share Clipboard", systemImage: "doc.on.clipboard")
+									Label("Share Clipboard", systemImage: "clipboard")
 									Text("Requires macOS 15 or later in the guest and a SPICE guest agent installed there.")
 										.font(.caption)
 										.foregroundStyle(.secondary)

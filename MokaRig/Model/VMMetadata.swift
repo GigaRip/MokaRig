@@ -37,9 +37,9 @@ struct VMMetadata: Codable, Equatable, Sendable {
 	/// Linux guests, which always use their own USB pointing device.
 	var attachMouse: Bool
 
-	/// Whether a macOS guest gets the SPICE console port used for clipboard sharing. Off by default:
-	/// it needs a macOS 15+ guest with a SPICE agent installed. Ignored by Linux guests, which always
-	/// get the port.
+	/// Whether a macOS guest gets the SPICE console port used for clipboard sharing, which also needs a
+	/// macOS 15+ guest with a SPICE agent installed. On for new VMs; VMs whose `Config.json` predates
+	/// this setting stay off. Ignored by Linux guests, which always get the port.
 	var shareClipboard: Bool
 
 	/// A lineage ID identifying VMs that are byte-for-byte copies of one another. Every VM gets a
@@ -91,7 +91,7 @@ struct VMMetadata: Codable, Equatable, Sendable {
 		installerMediaPath: nil,
 		dynamicResolution: false,
 		attachMouse: false,
-		shareClipboard: false,
+		shareClipboard: true,
 		cloneGroup: UUID())
 
 	/// Sensible defaults for a new macOS guest.
@@ -106,7 +106,7 @@ struct VMMetadata: Codable, Equatable, Sendable {
 		installerMediaPath: nil,
 		dynamicResolution: false,
 		attachMouse: false,
-		shareClipboard: false,
+		shareClipboard: true,
 		cloneGroup: UUID())
 }
 

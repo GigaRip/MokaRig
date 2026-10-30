@@ -134,7 +134,7 @@ struct ConfigureVMSheet: View {
 							}
 							Toggle(isOn: $shareClipboard) {
 								VStack(alignment: .leading, spacing: 2) {
-									Label("Share Clipboard", systemImage: "doc.on.clipboard")
+									Label("Share Clipboard", systemImage: "clipboard")
 									Text("Requires macOS 15 or later in the guest and a SPICE guest agent installed there.")
 										.font(.caption)
 										.foregroundStyle(.secondary)
